@@ -16,7 +16,8 @@ export type DayKey = string;
 export type ClockTime = string;
 
 export type Units = "metric" | "imperial";
-export type ThemePref = "system" | "light" | "dark";
+/** "schedule" = light by day, dark from wind-down until wake-up. */
+export type ThemePref = "schedule" | "system" | "light" | "dark";
 
 export interface NotificationPrefs {
   enabled: boolean;

@@ -3,7 +3,7 @@
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Info } from "lucide-react";
 import { useState } from "react";
 import { TrendChart } from "./charts";
-import { Card, Notice, Sheet, SourceBadge, cx } from "./ui";
+import { Notice, Sheet, SourceBadge, cx } from "./ui";
 import { formatDay } from "@/lib/date";
 import { planSleep } from "@/lib/sleep";
 import {
@@ -27,29 +27,38 @@ const META: Record<Kind, { title: string; unit: string; max: string }> = {
   sleep: { title: "Sleep", unit: "", max: "/100" },
 };
 
-const toneColor = (s: Score) => (s.status !== "ok" ? "var(--line)" : s.band === "high" ? "var(--accent)" : s.band === "mid" ? "var(--warn)" : "var(--bad)");
+const RING_COLOR: Record<Kind, string> = { energy: "var(--ring-energy)", recovery: "var(--ring-recovery)", sleep: "var(--ring-sleep)" };
+const RINGS: { kind: Kind; r: number }[] = [
+  { kind: "energy", r: 74 },
+  { kind: "recovery", r: 56 },
+  { kind: "sleep", r: 38 },
+];
 
-function Ring({ score, size = 104 }: { score: Score; size?: number }) {
-  const stroke = 8;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const v = score.status === "ok" ? score.value! : 0;
+/** Three nested activity-style rings (direction A) in per-metric colours. */
+function NestedRings({ scores }: { scores: DayScores }) {
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-2)" strokeWidth={stroke} strokeDasharray={score.status === "ok" ? undefined : "3 6"} />
-      {score.status === "ok" && (
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={toneColor(score)}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${(v / 100) * c} ${c}`}
-          className="transition-[stroke-dasharray] duration-700 motion-reduce:transition-none"
-        />
-      )}
+    <svg width="156" height="156" viewBox="0 0 172 172" aria-hidden className="shrink-0">
+      <g transform="rotate(-90 86 86)" fill="none" strokeWidth="13" strokeLinecap="round">
+        {RINGS.map(({ kind, r }) => {
+          const c = 2 * Math.PI * r;
+          const s = scores[kind];
+          return (
+            <g key={kind}>
+              <circle cx="86" cy="86" r={r} stroke="var(--ring-track)" strokeDasharray={s.status === "ok" ? undefined : "2 7"} />
+              {s.status === "ok" && (
+                <circle
+                  cx="86"
+                  cy="86"
+                  r={r}
+                  stroke={RING_COLOR[kind]}
+                  strokeDasharray={`${(s.value! / 100) * c} ${c}`}
+                  className="ring-draw"
+                />
+              )}
+            </g>
+          );
+        })}
+      </g>
     </svg>
   );
 }
@@ -57,7 +66,7 @@ function Ring({ score, size = 104 }: { score: Score; size?: number }) {
 function TrendIcon({ t }: { t: ScoreTrend }) {
   if (!t.direction) return null;
   const I = t.direction === "up" ? ArrowUpRight : t.direction === "down" ? ArrowDownRight : ArrowRight;
-  return <I size={12} aria-label={`trend ${t.direction}`} />;
+  return <I size={13} aria-label={`trend ${t.direction} vs last 7 days`} />;
 }
 
 export function ScoreRings({ scores, history, profile }: { scores: DayScores; history: ScorePoint[]; profile: Profile }) {
@@ -65,43 +74,50 @@ export function ScoreRings({ scores, history, profile }: { scores: DayScores; hi
   const kinds: Kind[] = ["energy", "recovery", "sleep"];
   return (
     <>
-      <section aria-label="Today's scores" className="card px-2 py-4">
-        <div className="grid grid-cols-3">
-          {kinds.map((k) => {
-            const s = scores[k];
-            const t = trendOf(history, k, s.value);
-            return (
-              <button key={k} onClick={() => setOpen(k)} className="flex flex-col items-center rounded-2xl py-1 active:bg-surface-2" aria-label={`${META[k].title}: ${s.status === "ok" ? `${s.value}${META[k].unit || META[k].max}, ${s.label}` : "not enough data"}. Open details.`}>
-                <div className="relative grid place-items-center">
-                  <Ring score={s} />
-                  <div className="absolute inset-0 grid place-items-center">
-                    <div className="text-center leading-none">
-                      <span className={cx("tabular text-[26px] font-semibold tracking-tight", s.status !== "ok" && "text-muted")}>{s.status === "ok" ? s.value : "—"}</span>
-                      {s.status === "ok" && <span className="text-xs text-muted">{META[k].unit}</span>}
-                    </div>
-                  </div>
-                </div>
-                <span className="eyebrow mt-2">{META[k].title}</span>
-                <span className="mt-0.5 flex items-center gap-0.5 text-xs text-muted">
-                  {s.status === "ok" ? (
-                    <>
-                      {s.label} <TrendIcon t={t} />
-                    </>
-                  ) : (
-                    "Not enough data"
-                  )}
-                </span>
-              </button>
-            );
-          })}
+      <section aria-label="Today's scores" className="card p-4">
+        <div className="flex items-center gap-4">
+          <NestedRings scores={scores} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            {kinds.map((k) => {
+              const s = scores[k];
+              const t = trendOf(history, k, s.value);
+              return (
+                <button
+                  key={k}
+                  onClick={() => setOpen(k)}
+                  className="-mx-2 flex min-h-12 flex-col items-start justify-center rounded-xl px-2 py-1 text-left active:bg-surface-2"
+                  aria-label={`${META[k].title}: ${s.status === "ok" ? `${s.value}${META[k].unit || META[k].max}, ${s.label}` : "not enough data"}. Open details.`}
+                >
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.08em] text-muted uppercase">
+                    <span className="h-2 w-2 rounded-full" style={{ background: RING_COLOR[k] }} />
+                    {META[k].title}
+                  </span>
+                  <span className="flex items-baseline gap-1.5">
+                    <span className={cx("num text-[26px] leading-tight font-semibold", s.status !== "ok" && "text-muted")}>
+                      {s.status === "ok" ? `${s.value}${META[k].unit}` : "—"}
+                    </span>
+                    <span className="flex items-center gap-0.5 text-xs font-semibold text-muted">
+                      {s.status === "ok" ? (
+                        <>
+                          {s.label} <TrendIcon t={t} />
+                        </>
+                      ) : (
+                        "Not enough data"
+                      )}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         {(scores.bodyBattery || scores.deviceSleepScore) && (
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line px-2 pt-3 text-xs text-muted">
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-surface-2 px-3 py-2.5 text-xs text-muted">
             {scores.bodyBattery && (
               <div>
                 <div>Garmin Body Battery</div>
                 <div>
-                  <strong className="tabular text-sm text-ink">{scores.bodyBattery.value}</strong>
+                  <strong className="num text-base text-ink">{scores.bodyBattery.value}</strong>
                   {scores.bodyBattery.change !== undefined && <span className="tabular"> · {scores.bodyBattery.change >= 0 ? "+" : ""}{scores.bodyBattery.change} vs yesterday</span>}
                 </div>
               </div>
@@ -109,7 +125,7 @@ export function ScoreRings({ scores, history, profile }: { scores: DayScores; hi
             {scores.deviceSleepScore && (
               <div className="text-right">
                 <div>Device sleep score</div>
-                <strong className="tabular text-sm text-ink">{scores.deviceSleepScore.value}</strong>
+                <strong className="num text-base text-ink">{scores.deviceSleepScore.value}</strong>
               </div>
             )}
           </div>
@@ -122,22 +138,26 @@ export function ScoreRings({ scores, history, profile }: { scores: DayScores; hi
   );
 }
 
+const READY_TONE: Record<Readiness["level"], { box: string; chip: string; dot: string }> = {
+  ready: { box: "border-accent/30 bg-accent-soft", chip: "bg-accent text-accent-ink", dot: "bg-accent" },
+  moderate: { box: "border-warn/30 bg-warn/10", chip: "bg-warn text-bg", dot: "bg-warn" },
+  recovery: { box: "border-bad/30 bg-bad/10", chip: "bg-bad text-bg", dot: "bg-bad" },
+  insufficient: { box: "border-line bg-surface", chip: "bg-surface-2 text-muted", dot: "bg-muted" },
+};
+
 export function ReadinessCard({ r }: { r: Readiness }) {
-  const tone = r.level === "ready" ? "bg-accent-soft text-accent" : r.level === "moderate" ? "bg-warn/10 text-warn" : r.level === "recovery" ? "bg-bad/10 text-bad" : "bg-surface-2 text-muted";
+  const tone = READY_TONE[r.level];
   return (
-    <Card>
+    <section aria-label="Readiness" className={cx("rounded-3xl border px-4 py-3.5", tone.box)}>
       <div className="flex items-center justify-between">
-        <span className="eyebrow">Readiness</span>
+        <span className={cx("rounded-full px-2.5 py-1 text-[11px] font-extrabold tracking-[0.1em] uppercase", tone.chip)}>{r.title}</span>
         <SourceBadge source="calculated" />
       </div>
-      <div className="mt-2 flex items-start gap-3">
-        <span className={cx("shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide uppercase", tone)}>{r.title}</span>
-        <p className="text-[15px] leading-snug">{r.text}</p>
-      </div>
-      {r.reasons.length > 0 && <p className="mt-2 text-xs text-muted">Based on: {r.reasons.join(", ")}.</p>}
+      <p className="mt-2 text-[15px] leading-snug font-semibold">{r.text}</p>
+      {r.reasons.length > 0 && <p className="mt-1 text-xs text-muted">Based on {r.reasons.join(", ")} — never one number alone.</p>}
       {r.safety && <div className="mt-2"><Notice tone="bad">{r.safety}</Notice></div>}
-      {r.level === "ready" && <p className="mt-2 text-xs text-muted">A good score is not a reason to push harder than planned.</p>}
-    </Card>
+      {r.level === "ready" && <p className="mt-1 text-xs text-muted">A good score isn&apos;t a reason to push harder than planned.</p>}
+    </section>
   );
 }
 
@@ -190,7 +210,7 @@ function ScoreDetail({ kind, scores, history, profile }: { kind: Kind; scores: D
     <div className="space-y-4">
       <div className="flex items-end justify-between">
         <div>
-          <div className="tabular text-4xl font-semibold">{s.status === "ok" ? `${s.value}${META[kind].unit || ""}` : "—"}</div>
+          <div className="num text-6xl leading-none font-semibold" style={{ color: s.status === "ok" ? RING_COLOR[kind] : undefined }}>{s.status === "ok" ? `${s.value}${META[kind].unit || ""}` : "—"}</div>
           <div className="text-sm text-muted">{s.status === "ok" ? s.label : "Not enough data to calculate a reliable score."}</div>
         </div>
         <div className="text-right text-xs text-muted">
@@ -225,19 +245,36 @@ function ScoreDetail({ kind, scores, history, profile }: { kind: Kind; scores: D
         <div>
           <div className="eyebrow mb-1">Contributing factors</div>
           <ul className="divide-y divide-line">
-            {factors.map((c) => (
-              <li key={c.key} className="flex items-center justify-between gap-2 py-2 text-sm">
-                <span className="min-w-0">
-                  <span className="block">{c.label}</span>
-                  <span className="block text-xs text-muted">{c.input}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <span className="tabular text-xs text-muted">{c.weight}%</span>
-                  <span className={cx("tabular w-9 rounded-md py-0.5 text-center text-xs font-medium", c.points! >= 67 ? "bg-accent-soft text-accent" : c.points! >= 34 ? "bg-warn/10 text-warn" : "bg-bad/10 text-bad")}>{c.points}</span>
-                  {c.source && <SourceBadge source={c.source} />}
-                </span>
-              </li>
-            ))}
+            {factors.map((c) => {
+              const impact = c.points! >= 75 ? "helps" : c.points! < 55 ? "lowers" : "neutral";
+              return (
+                <li key={c.key} className="py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{c.label}</span>
+                      <span className="block text-xs text-muted">{c.input}</span>
+                    </span>
+                    <span
+                      className={cx(
+                        "shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold",
+                        impact === "helps" && "bg-accent text-accent-ink",
+                        impact === "lowers" && "bg-warn text-bg",
+                        impact === "neutral" && "border border-line text-muted",
+                      )}
+                    >
+                      {impact === "helps" ? "+ helps" : impact === "lowers" ? "− lowers" : "neutral"}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+                      <span className="block h-full rounded-full" style={{ width: `${c.points}%`, background: RING_COLOR[kind] }} />
+                    </span>
+                    <span className="tabular w-16 text-right text-[11px] text-muted">weight {c.weight}%</span>
+                    {c.source && <SourceBadge source={c.source} />}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

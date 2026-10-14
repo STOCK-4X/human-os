@@ -4,12 +4,12 @@ import { WifiOff } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 import { DEMO_FLAG } from "@/lib/demo";
-import { useDataSet, useOnline, useProfile } from "@/hooks/data";
+import { useDataSet, useNow, useOnline, useProfile } from "@/hooks/data";
 import { requestPersistence } from "@/lib/db";
 import { todayKey } from "@/lib/date";
 import { dueReminders, showNotification } from "@/lib/notifications";
 
-import { THEME_KEY } from "@/lib/theme";
+import { THEME_KEY, resolveTheme } from "@/lib/theme";
 import { Celebration } from "./achievements/Celebration";
 
 /** App-wide side effects: service worker, theme, onboarding, reminders, offline banner. */
@@ -27,15 +27,17 @@ export function AppRuntime() {
     void requestPersistence();
   }, []);
 
+  const now = useNow(60_000);
   useEffect(() => {
     if (!profile) return;
     const root = document.documentElement;
-    if (profile.theme === "system") root.removeAttribute("data-theme");
-    else root.setAttribute("data-theme", profile.theme);
+    const resolved = resolveTheme(profile, now);
+    if (resolved) root.setAttribute("data-theme", resolved);
+    else root.removeAttribute("data-theme");
     try {
-      localStorage.setItem(THEME_KEY, profile.theme);
+      localStorage.setItem(THEME_KEY, resolved ?? "system");
     } catch {}
-  }, [profile]);
+  }, [profile, now]);
 
   useEffect(() => {
     if (profile && !profile.onboarded && !path.startsWith("/onboarding")) router.replace("/onboarding");

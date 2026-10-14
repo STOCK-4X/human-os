@@ -105,7 +105,7 @@ export function defaultProfile(): Profile {
     displayName: "",
     units: "metric",
     timeZone: deviceTimeZone(),
-    theme: "system",
+    theme: "schedule",
     targetWake: "06:30",
     sleepNeedMin: 450,
     windDownMin: 45,

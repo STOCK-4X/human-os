@@ -10,7 +10,7 @@ import { SleepForm } from "@/components/forms/SleepForm";
 import { WorkoutForm, ACTIVITY_LABEL } from "@/components/forms/WorkoutForm";
 import { HabitList } from "@/components/HabitList";
 import { ReadinessCard, ScoreRings } from "@/components/ScoreRings";
-import { Card, Empty, Loading, Page, ProgressBar, Sheet, SourceBadge, Stat } from "@/components/ui";
+import { Card, Empty, Loading, Page, Sheet, SourceBadge, Stat } from "@/components/ui";
 import { useDataSet, useNow } from "@/hooks/data";
 import { buildBriefing } from "@/lib/briefing";
 import { addDays, clockOf, dayProgress, formatDay, formatDuration, formatInstant, todayKey } from "@/lib/date";
@@ -80,35 +80,20 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
 
   const steps = metricOn(data.metrics, "steps", today) ?? metricOn(data.metrics, "steps", addDays(today, -1));
 
+  const progress = dayProgress(clock, profile.targetWake, plan.lightsOut);
+  const windPos = dayProgress(plan.windDownStart, profile.targetWake, plan.lightsOut);
   return (
     <Page
+      eyebrow={`${formatDay(today, "EEE d MMM")} · ${clock}`}
       title={`${greeting(clock)}${profile.displayName ? `, ${profile.displayName}` : ""}`}
-      subtitle={
-        <span className="tabular">
-          {formatDay(today, "EEEE d MMMM")} · {clock}
-        </span>
-      }
       action={
-        <Link href="/coach" className="btn-ghost h-11 w-11 shrink-0 rounded-full px-0" aria-label="Open AI coach">
+        <Link href="/coach" className="btn-ghost h-11 w-11 shrink-0 rounded-full px-0 text-accent" aria-label="Open AI coach">
           <Sparkles size={18} />
         </Link>
       }
     >
-      <div className="space-y-2">
-        <ProgressBar value={dayProgress(clock, profile.targetWake, plan.lightsOut)} label="Progress through your day" />
-        <div className="flex justify-between text-xs text-muted tabular">
-          <span>Wake {profile.targetWake}</span>
-          <span>Wind down {plan.windDownStart}</span>
-          <span>Lights out {plan.lightsOut}</span>
-        </div>
-      </div>
-
-      {checkin?.intention && (
-        <p className="text-[17px] leading-snug">
-          <span className="eyebrow block">Today&apos;s intention</span>
-          {checkin.intention}
-        </p>
-      )}
+      <ScoreRings scores={scores} history={history} profile={profile} />
+      <ReadinessCard r={scores.readiness} />
 
       {!checkin && !skipped && (
         <div className="card flex items-center gap-3">
@@ -136,8 +121,41 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
         </div>
       )}
 
-      <ScoreRings scores={scores} history={history} profile={profile} />
-      <ReadinessCard r={scores.readiness} />
+      {checkin && (
+        <button onClick={() => setSheet("checkin")} className="flex w-full items-center justify-between rounded-2xl px-1 text-left text-sm text-muted">
+          <span>
+            Felt energy <strong className="num text-ink">{checkin.energy ?? "—"}</strong>/10 · tiredness <strong className="num text-ink">{checkin.fatigue ?? "—"}</strong>/10 · focus{" "}
+            <strong className="num text-ink">{checkin.focus ?? "—"}</strong>/10
+            {checkin.intention ? ` · “${checkin.intention}”` : ""}
+          </span>
+          <span className="text-xs">Edit</span>
+        </button>
+      )}
+
+      <section aria-label="Your day" className="card">
+        <div className="flex justify-between text-xs text-muted tabular">
+          <span>Wake {profile.targetWake}</span>
+          <span className="font-semibold text-ink">Now {clock}</span>
+          <span>Lights out {plan.lightsOut}</span>
+        </div>
+        <div className="relative mt-2.5 h-2 rounded-full bg-surface-2" role="progressbar" aria-label="Progress through your day" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+          <div className="h-2 rounded-full bg-accent transition-[width]" style={{ width: `${progress * 100}%` }} />
+          <div className="absolute -top-1 h-4 w-0.5 rounded bg-warn" style={{ left: `${windPos * 100}%` }} title={`Wind down ${plan.windDownStart}`} />
+        </div>
+        <p className="mt-2.5 text-sm text-muted">
+          <Moon size={14} aria-hidden className="mr-1 inline align-[-2px]" />
+          Wind down at <strong className="tabular text-ink">{plan.windDownStart}</strong> for {formatDuration(profile.sleepNeedMin)} of sleep before {plan.wake}.
+        </p>
+      </section>
+
+      <Card title="Habits" action={<Link href="/habits" className="text-sm text-muted">All</Link>}>
+        <HabitList
+          habits={data.habits}
+          logs={data.habitLogs}
+          date={today}
+          empty={<Empty title="No habits yet" action={<Link className="btn-ghost" href="/habits">Set up habits</Link>}>Start with two or three small ones.</Empty>}
+        />
+      </Card>
 
       <Card title="Today's focus" action={<SourceBadge source="calculated" />}>
         <p className="text-[17px] leading-snug font-medium">{brief.focus}</p>
@@ -164,6 +182,16 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
         </Link>
       </Card>
 
+      <Card title="Quick log">
+        <LifestyleLogger profile={profile} date={today} logs={data.lifestyle} />
+      </Card>
+
+      <details className="group">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-2xl px-1 text-sm font-semibold text-muted">
+          Sleep, body signals & activity
+          <ChevronRight size={18} className="transition-transform group-open:rotate-90" aria-hidden />
+        </summary>
+        <div className="mt-2 space-y-4">
       <Card
         title="Sleep"
         action={
@@ -227,48 +255,8 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
           <Stat label="Sessions" value={workoutsToday.length || undefined} hint={workoutsToday.map((w) => ACTIVITY_LABEL[w.type]).join(", ") || undefined} source="manual" />
         </div>
       </Card>
-
-      {checkin && (
-        <Card
-          title="How you feel"
-          action={
-            <button className="btn-quiet min-h-9 px-2 text-sm" onClick={() => setSheet("checkin")}>
-              Edit
-            </button>
-          }
-        >
-          <div className="grid grid-cols-3 gap-3">
-            <Stat label="Energy" value={checkin.energy} unit="/10" />
-            <Stat label="Tiredness" value={checkin.fatigue} unit="/10" />
-            <Stat label="Focus" value={checkin.focus} unit="/10" />
-          </div>
-          {checkin.unwell && <p className="mt-2 text-sm text-bad">You noted feeling unwell — this takes priority over any score.</p>}
-        </Card>
-      )}
-
-      <Card title="Habits" action={<Link href="/habits" className="text-sm text-muted">All</Link>}>
-        <HabitList
-          habits={data.habits}
-          logs={data.habitLogs}
-          date={today}
-          empty={<Empty title="No habits yet" action={<Link className="btn-ghost" href="/habits">Set up habits</Link>}>Start with two or three small ones.</Empty>}
-        />
-      </Card>
-
-      <Card title="Quick log">
-        <LifestyleLogger profile={profile} date={today} logs={data.lifestyle} />
-      </Card>
-
-      <Card title="Tonight" action={<Moon size={16} className="text-muted" />}>
-        <p className="text-sm">
-          Start winding down at <strong className="tabular">{plan.windDownStart}</strong>, lights out around{" "}
-          <strong className="tabular">{plan.lightsOut}</strong> to get {formatDuration(profile.sleepNeedMin)} of sleep before{" "}
-          <strong className="tabular">{plan.wake}</strong>.
-        </p>
-        <Link href="/health?tab=sleep" className="mt-2 inline-block text-sm text-accent">
-          Adjust in sleep planner →
-        </Link>
-      </Card>
+        </div>
+      </details>
 
       <div className="grid grid-cols-3 gap-2">
         <Link href="/review" className="btn-ghost px-2">Review</Link>

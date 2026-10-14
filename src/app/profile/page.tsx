@@ -83,7 +83,8 @@ function Settings({ data }: { data: DataSet }) {
           <TextSetting label="Typical work schedule" value={p.workSchedule ?? ""} onSave={(workSchedule) => set({ workSchedule })} placeholder="e.g. Mon–Fri 9–17, office Tue/Thu" />
           <div>
             <span className="label">Appearance</span>
-            <Segmented label="Theme" value={p.theme} onChange={(theme) => set({ theme })} options={[{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
+            <Segmented label="Theme" value={p.theme} onChange={(theme) => set({ theme })} options={[{ value: "schedule", label: "Auto" }, { value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
+            <p className="mt-1 text-xs text-muted">Auto: light during the day, dark from your wind-down time until you wake up.</p>
           </div>
         </div>
       </Card>

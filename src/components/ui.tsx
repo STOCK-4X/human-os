@@ -9,12 +9,13 @@ export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
 }
 
-export function Page({ title, subtitle, action, children }: { title: string; subtitle?: ReactNode; action?: ReactNode; children: ReactNode }) {
+export function Page({ title, eyebrow, subtitle, action, children }: { title: string; eyebrow?: ReactNode; subtitle?: ReactNode; action?: ReactNode; children: ReactNode }) {
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pt-[max(env(safe-area-inset-top),1.25rem)] pb-28 fade-in">
+    <main className="mx-auto w-full max-w-xl px-4 pt-[max(env(safe-area-inset-top),1.5rem)] pb-32 fade-in">
       <header className="mb-5 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-[28px] leading-tight font-semibold tracking-tight">{title}</h1>
+          {eyebrow && <div className="tabular text-xs font-semibold tracking-[0.06em] text-muted uppercase">{eyebrow}</div>}
+          <h1 className="text-[28px] leading-tight font-extrabold tracking-[-0.02em]">{title}</h1>
           {subtitle && <div className="mt-0.5 text-sm text-muted">{subtitle}</div>}
         </div>
         {action}

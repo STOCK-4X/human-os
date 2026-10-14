@@ -22,11 +22,8 @@ export function BottomNav() {
   const path = usePathname();
   if (path.startsWith("/onboarding")) return null;
   return (
-    <nav
-      aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
-    >
-      <ul className="mx-auto flex max-w-xl">
+    <nav aria-label="Main" className="fixed inset-x-3 bottom-[max(env(safe-area-inset-bottom),12px)] z-40 mx-auto max-w-lg">
+      <ul className="flex rounded-[22px] border border-line bg-[var(--nav)] shadow-[0_8px_30px_rgb(0_0_0/0.08)] backdrop-blur-xl">
         {TABS.map(({ href, label, icon: Icon, match }) => {
           const active = match(path);
           return (
@@ -35,8 +32,8 @@ export function BottomNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
-                  active ? "text-accent" : "text-muted",
+                  "flex min-h-[60px] flex-col items-center justify-center gap-0.5 text-[11px]",
+                  active ? "font-bold text-accent" : "font-medium text-muted",
                 )}
               >
                 <Icon size={22} strokeWidth={active ? 2.2 : 1.8} aria-hidden />
