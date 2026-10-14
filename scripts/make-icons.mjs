@@ -1,10 +1,10 @@
 // Generates the PWA icons as PNGs with no dependencies (pure zlib PNG encoder).
-// Design: sage rounded mark — a ring with a rising arc, on a warm dark background.
+// Design: orange rounded mark — a ring with a rising arc, on a warm dark background.
 import { deflateSync } from "node:zlib";
 import { mkdirSync, writeFileSync } from "node:fs";
 
 const BG = [14, 15, 15];
-const FG = [127, 181, 163];
+const FG = [252, 76, 2];
 
 function crc32(buf) {
   let c;

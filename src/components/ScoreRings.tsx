@@ -139,7 +139,7 @@ export function ScoreRings({ scores, history, profile }: { scores: DayScores; hi
 }
 
 const READY_TONE: Record<Readiness["level"], { box: string; chip: string; dot: string }> = {
-  ready: { box: "border-accent/30 bg-accent-soft", chip: "bg-accent text-accent-ink", dot: "bg-accent" },
+  ready: { box: "border-good/30 bg-good/10", chip: "bg-good text-bg", dot: "bg-good" },
   moderate: { box: "border-warn/30 bg-warn/10", chip: "bg-warn text-bg", dot: "bg-warn" },
   recovery: { box: "border-bad/30 bg-bad/10", chip: "bg-bad text-bg", dot: "bg-bad" },
   insufficient: { box: "border-line bg-surface", chip: "bg-surface-2 text-muted", dot: "bg-muted" },
