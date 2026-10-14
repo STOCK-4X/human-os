@@ -41,6 +41,7 @@ export function Card({ title, action, children, className }: { title?: ReactNode
 
 const SOURCE_LABEL: Record<Provenance, string> = {
   garmin: "Garmin",
+  health: "Apple Health",
   device: "Device",
   csv: "Imported",
   manual: "You",

@@ -3,6 +3,7 @@
 import { Download, Upload } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useMemo, useState } from "react";
+import { AppleHealthCard } from "@/components/AppleHealthCard";
 import { ACTIVITY_LABEL } from "@/components/forms/WorkoutForm";
 import { Card, Field, Loading, Notice, Page, Segmented, Sheet, Toggle, cx } from "@/components/ui";
 import { useDataSet } from "@/hooks/data";
@@ -153,6 +154,7 @@ function Settings({ data }: { data: DataSet }) {
       </Card>
 
       <Notifications p={p} />
+      <AppleHealthCard profile={p} />
       <Integrations />
       <Coach data={data} />
       <DataPrivacy />

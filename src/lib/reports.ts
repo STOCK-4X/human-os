@@ -29,7 +29,7 @@ export interface DataSet {
 }
 
 /** User corrections win, then device sources, then file imports. */
-const SOURCE_PRIORITY: Source[] = ["manual", "garmin", "device", "csv"];
+const SOURCE_PRIORITY: Source[] = ["manual", "garmin", "health", "device", "csv"];
 const rank = (s: Source) => SOURCE_PRIORITY.indexOf(s);
 
 export interface Point {

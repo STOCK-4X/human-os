@@ -6,7 +6,8 @@
  */
 
 /** Where a value came from. Never mix these when displaying. */
-export type Source = "manual" | "garmin" | "csv" | "device";
+/** "health" = Apple Health (delivered by the iOS Shortcut inbox). */
+export type Source = "manual" | "garmin" | "health" | "csv" | "device";
 /** Derived values are never stored as measurements; they are computed on read. */
 export type Provenance = Source | "calculated" | "ai";
 
@@ -340,7 +341,7 @@ export interface AiSummary {
 
 export interface SyncLog {
   id?: number;
-  provider: "garmin" | "csv";
+  provider: "garmin" | "csv" | "health";
   at: string;
   status: "ok" | "partial" | "error";
   message: string;
