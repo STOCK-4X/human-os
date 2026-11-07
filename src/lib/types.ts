@@ -64,6 +64,11 @@ export interface Profile {
   /** Optional token sent to /api/coach when the server requires one. */
   coachToken?: string;
   aiEnabled: boolean;
+  /** Heart-rate zone method: % of max, Karvonen heart-rate reserve, or Friel lactate threshold. */
+  zoneMethod: "hrmax" | "hrr" | "lthr";
+  /** Lactate-threshold heart rate (bpm), e.g. from a 30-min field test or the watch. */
+  lthr?: number;
+  goalRace?: { name: string; date: DayKey; distanceKm?: number };
   /** full = a celebration sheet, subtle = a small toast, off = timeline only. */
   celebrations: "full" | "subtle" | "off";
   onboarded: boolean;

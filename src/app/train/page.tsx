@@ -10,6 +10,9 @@ import { useDataSet, useToday } from "@/hooks/data";
 import { buildBriefing } from "@/lib/briefing";
 import { addDays, formatDay, formatDuration, formatInstant, weekStart } from "@/lib/date";
 import type { DataSet } from "@/lib/reports";
+import { dailyLoads } from "@/lib/analytics";
+import { PHASE_INFO, seasonPlan } from "@/lib/performance";
+import Link from "next/link";
 import { adjustForReadiness, formatPace, pace, strengthProgress, weeklyPlan, type PlannedSession } from "@/lib/training";
 import type { DayKey, Workout } from "@/lib/types";
 
@@ -76,6 +79,7 @@ function Train({ data, today, onEdit }: { data: DataSet; today: DayKey; onEdit: 
 
       {view === "plan" && (
         <>
+          <SeasonCard data={data} today={today} />
           <Card title="This week's plan" action={<SourceBadge source="calculated" />}>
             {plan.length === 0 ? (
               <Empty title="No training days set">Choose your available days in Profile.</Empty>
@@ -217,5 +221,57 @@ function WorkoutList({ workouts, imp, onEdit, tz }: { workouts: Workout[]; imp: 
         </li>
       ))}
     </ul>
+  );
+}
+
+function SeasonCard({ data, today }: { data: DataSet; today: DayKey }) {
+  const goal = data.profile.goalRace;
+  if (!goal || goal.date < today)
+    return (
+      <Card title="Season plan">
+        <p className="text-sm text-muted">Set a goal race in Profile → Performance and Human OS lays out Base → Build → Peak → Taper weeks with load targets.</p>
+        <Link href="/profile#performance" className="btn-ghost mt-3 w-full">Set a goal race</Link>
+      </Card>
+    );
+  const weeks = seasonPlan(goal, today);
+  const typical = (() => {
+    const loads = [...dailyLoads(data.workouts, addDays(today, -27), today).values()];
+    return Math.round(loads.reduce((a, b) => a + b, 0) / 4);
+  })();
+  const thisWeek = weeks[0];
+  const actual = [...dailyLoads(data.workouts, thisWeek.weekStart, today).values()].reduce((a, b) => a + b, 0);
+  const target = typical ? Math.round(typical * thisWeek.loadFactor) : undefined;
+  return (
+    <Card title={`Season · ${goal.name}`} action={<span className="text-xs text-muted">{formatDay(goal.date, "d MMM yyyy")}</span>}>
+      <div className="flex items-baseline justify-between">
+        <span className="text-[17px] font-semibold">
+          {PHASE_INFO[thisWeek.phase].label}
+          {thisWeek.deload && " · lighter week"}
+        </span>
+        <span className="text-xs text-muted">{weeks.length} weeks to go</span>
+      </div>
+      <p className="mt-1 text-sm text-muted">{PHASE_INFO[thisWeek.phase].focus}</p>
+      {target !== undefined && (
+        <p className="mt-2 text-sm">
+          Load this week: <strong className="num">{actual}</strong> of ≈<strong className="num">{target}</strong>
+          <span className="text-muted"> (your usual week {typical})</span>
+        </p>
+      )}
+      <div className="mt-3 flex h-16 items-end gap-[3px]" aria-label="Weekly load targets by phase">
+        {weeks.map((w, i) => (
+          <span
+            key={w.weekStart}
+            title={`${formatDay(w.weekStart, "d MMM")} · ${PHASE_INFO[w.phase].label} · ×${w.loadFactor}`}
+            className={cx("flex-1 rounded-t", i === 0 ? "bg-accent" : w.phase === "taper" || w.phase === "race" ? "bg-good/60" : w.deload ? "bg-line" : "bg-accent/40")}
+            style={{ height: `${Math.max(8, (w.loadFactor / 1.6) * 100)}%` }}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-muted">
+        <span>Now</span>
+        <span>Race</span>
+      </div>
+      <p className="mt-2 text-xs text-muted">Targets are relative to your usual week and grow at most ≈5% a week (capped at +50%). Every 4th loading week is lighter; the taper cuts volume ≈40–60%.</p>
+    </Card>
   );
 }

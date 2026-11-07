@@ -9,7 +9,6 @@ import { Card, Empty, Notice, Segmented, SourceBadge, cx } from "../ui";
 import {
   formState,
   hrMax,
-  hrZones,
   loadFlag,
   personalRecords,
   pmc,
@@ -20,6 +19,9 @@ import {
   zoneDistribution,
 } from "@/lib/analytics";
 import { db } from "@/lib/db";
+import { metricBaseline } from "@/lib/reports";
+import { RACES, bestVdot, fuelTargets, hrvTrend, predictTime, trainingPaces, zonesFor } from "@/lib/performance";
+import Link from "next/link";
 import { addDays, formatDay, formatDuration } from "@/lib/date";
 import type { DataSet } from "@/lib/reports";
 import { scoresFor } from "@/lib/scores";
@@ -63,7 +65,15 @@ export function AnalyticsView({ data, today }: { data: DataSet; today: DayKey })
   const week = volume(workouts, addDays(today, -6), today);
   const fourWeeks = volume(workouts, addDays(today, -27), today);
   const max = hrMax(workouts, profile, today);
-  const zones = max ? hrZones(max.bpm) : [];
+  const rest = metricBaseline(data.metrics, "rhr", today).mean;
+  const method = profile.zoneMethod ?? "hrmax";
+  const zones = zonesFor(method, { max: max?.bpm, rest, lthr: profile.lthr }) ?? (max ? zonesFor("hrmax", { max: max.bpm }) : undefined) ?? [];
+  const zonesFellBack = method !== "hrmax" && !zonesFor(method, { max: max?.bpm, rest, lthr: profile.lthr });
+  const run = bestVdot(workouts, today);
+  const hrv = hrvTrend(data.metrics, today);
+  const todayMin = workouts.filter((w) => w.date === today).reduce((a, w) => a + w.durationMin, 0);
+  const avgMin = Math.round(volume(workouts, addDays(today, -6), today).hours * 60 / 7);
+  const fuel = weight?.weightKg ? fuelTargets(weight.weightKg, todayMin || avgMin) : undefined;
   const dist = zoneDistribution(workouts, addDays(today, -27), today);
   const prs = personalRecords(workouts, imp);
   const debt = sleepDebt(data, today);
@@ -204,22 +214,87 @@ export function AnalyticsView({ data, today }: { data: DataSet; today: DayKey })
         <p className="mt-2 text-xs text-muted">Sport split over the last 4 weeks.</p>
       </Card>
 
-      <Card title="Heart-rate zones" action={max && <span className="text-xs text-muted">HRmax {max.bpm} · {max.source === "observed" ? "highest seen" : "age estimate"}</span>}>
-        {max ? (
-          <div className="grid grid-cols-5 gap-1.5">
-            {zones.map((z) => (
-              <div key={z.zone} className="rounded-xl bg-surface-2 p-2 text-center">
-                <div className="text-[10px] font-bold text-muted">Z{z.zone}</div>
-                <div className="tabular text-xs font-semibold">
-                  {z.low}–{z.high}
+      <Card title="Running fitness" action={<SourceBadge source="calculated" />}>
+        {run ? (
+          <>
+            <div className="flex items-baseline gap-2">
+              <span className="num text-4xl font-semibold">{run.vdot}</span>
+              <span className="text-sm text-muted">VDOT · from your {run.from.label} on {formatDay(run.from.date, "d MMM")}</span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {RACES.map((r) => (
+                <div key={r.label} className="rounded-xl bg-surface-2 px-3 py-2">
+                  <div className="text-xs text-muted">{r.label}</div>
+                  <div className="num text-lg font-semibold">{hms(predictTime(run.vdot, r.m))}</div>
                 </div>
-                <div className="tabular mt-1 text-[10px] text-muted">{dist.minutes[z.zone - 1] ? `${dist.minutes[z.zone - 1]}m` : "—"}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div className="eyebrow mt-4 mb-1">Training paces (/{imp ? "mi" : "km"})</div>
+            <ul className="divide-y divide-line">
+              {trainingPaces(run.vdot).map((p) => (
+                <li key={p.key} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                  <span className="min-w-0">
+                    <strong>{p.key}</strong> {p.label} <span className="block truncate text-xs text-muted">{p.purpose}</span>
+                  </span>
+                  <span className="num shrink-0 font-semibold">
+                    {pace(p.secPerKm[0], imp)}
+                    {p.key === "E" && `–${pace(p.secPerKm[1], imp)}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted">Daniels VDOT from fast segments of your runs — usually a little below true race fitness. Log a race to sharpen it.</p>
+          </>
         ) : (
-          <p className="text-sm text-muted">Add your birth year in Profile, or sync workouts with heart rate, to calculate zones.</p>
+          <p className="text-sm text-muted">Needs a run with a 5 km or 10 km split in the last 6 months.</p>
         )}
+      </Card>
+
+      <Card title="HRV trend" action={<SourceBadge source="calculated" />}>
+        {hrv.status === "ok" ? (
+          <>
+            <div className="flex items-baseline gap-2">
+              <span className="num text-3xl font-semibold">{hrv.rolling7}</span>
+              <span className="text-sm text-muted">ms · 7-day average</span>
+              <span className={cx("ml-auto rounded-full px-2 py-0.5 text-xs font-semibold", hrv.band === "within" ? "bg-good/15 text-good" : "bg-warn/15 text-warn")}>
+                {hrv.band === "within" ? "In your normal range" : hrv.band === "below" ? "Below normal" : "Above normal"}
+              </span>
+            </div>
+            <TrendChart label="7-day rolling HRV with your normal range" data={hrv.series.map((p) => ({ date: p.date, value: p.rolling }))} band={{ low: hrv.normalLow!, high: hrv.normalHigh! }} />
+            <p className="mt-1 text-sm text-muted">
+              {hrv.band === "within"
+                ? "Recovery capacity looks normal — train as planned."
+                : hrv.band === "below"
+                  ? "Your weekly HRV is under your usual range: favour easier sessions until it returns, especially if you also feel tired."
+                  : "Above your usual range. Usually fine; if resting HR is also up and you feel flat, it can signal accumulated fatigue."}{" "}
+              Day-to-day variation {hrv.cv}% · normal {hrv.normalLow}–{hrv.normalHigh} ms.
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-muted">
+            {hrv.days < 21
+              ? `Needs 3 weeks of overnight HRV (${hrv.days} nights so far).`
+              : `Needs at least 4 nights of HRV in the last 7 days (${hrv.recentNights} so far) — wear your watch to sleep.`}
+          </p>
+        )}
+      </Card>
+
+      <Card title="Heart-rate zones" action={<span className="text-xs text-muted">{method === "hrr" ? "Heart-rate reserve" : method === "lthr" ? "Lactate threshold" : "% of HRmax"}{max ? ` · max ${max.bpm}` : ""}</span>}>
+        {zones.length ? (
+          <ul className="divide-y divide-line">
+            {zones.map((z) => (
+              <li key={z.zone} className="flex items-center gap-3 py-1.5 text-sm">
+                <span className="w-8 font-bold">Z{z.zone}</span>
+                <span className="flex-1 text-muted">{z.name}</span>
+                <span className="num w-24 text-right font-semibold">{z.zone === 1 && method === "lthr" ? `< ${z.high + 1}` : `${z.low}–${z.high}`}</span>
+                <span className="tabular w-12 text-right text-xs text-muted">{dist.minutes[z.zone - 1] ? `${dist.minutes[z.zone - 1]}m` : "—"}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">Add your birth year or lactate threshold in Profile → Performance, or sync workouts with heart rate.</p>
+        )}
+        {zonesFellBack && <p className="mt-1 text-xs text-warn">{method === "lthr" ? "Add your lactate-threshold HR in Profile" : "Needs a resting-HR baseline"} — showing % of HRmax for now.</p>}
         {dist.share && (
           <>
             <div className="mt-3 flex h-2 overflow-hidden rounded-full" aria-hidden>
@@ -228,9 +303,35 @@ export function AnalyticsView({ data, today }: { data: DataSet; today: DayKey })
               ))}
             </div>
             <p className="mt-2 text-xs text-muted">
-              Last 4 weeks: {Math.round(dist.easyShare! * 100)}% easy (Z1–2), {Math.round(dist.hardShare! * 100)}% hard (Z4–5) across {dist.sessions} sessions. Many endurance athletes aim for roughly 80% easy.
+              Last 4 weeks: {Math.round(dist.easyShare! * 100)}% easy (Z1–2), {Math.round(dist.hardShare! * 100)}% hard (Z4–5). Most endurance athletes do ≈80% easy. Minutes use your watch&apos;s zones.
             </p>
           </>
+        )}
+      </Card>
+
+      <Card title="Fuel today" action={<SourceBadge source="calculated" />}>
+        {fuel ? (
+          <>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl bg-surface-2 py-2">
+                <div className="text-xs text-muted">Protein</div>
+                <div className="num font-semibold">{fuel.proteinG[0]}–{fuel.proteinG[1]} g</div>
+              </div>
+              <div className="rounded-xl bg-surface-2 py-2">
+                <div className="text-xs text-muted">Carbs</div>
+                <div className="num font-semibold">{fuel.carbsG[0]}–{fuel.carbsG[1]} g</div>
+              </div>
+              <div className="rounded-xl bg-surface-2 py-2">
+                <div className="text-xs text-muted">Fluids</div>
+                <div className="num font-semibold">≈{(fuel.fluidMl / 1000).toFixed(1)} L</div>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              For a {fuel.carbBand} training day ({todayMin || avgMin} min). Spread protein over 3–5 meals; eat more carbs around harder sessions. Ranges to fuel training, not limits.
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-muted">Add your weight in Health → Body to see daily protein and carb ranges.</p>
         )}
       </Card>
 
@@ -271,9 +372,26 @@ export function AnalyticsView({ data, today }: { data: DataSet; today: DayKey })
             <strong className="text-ink">Sleep debt</strong> = shortfall vs your own sleep need over the last 7 logged nights.
           </li>
           <li>These are Human OS estimates from published training-science methods. They are not Garmin&apos;s or TrainingPeaks&apos; numbers and they don&apos;t diagnose anything.</li>
+          <li>
+            <Link href="/evidence" className="font-semibold text-accent">
+              All methods and research sources →
+            </Link>
+          </li>
         </ul>
       </details>
       {!series.reliable && <Notice>Analytics get more accurate with at least 6 weeks of synced training.</Notice>}
     </div>
   );
+}
+
+function hms(sec: number) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.round(sec % 60);
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function pace(secPerKm: number, imperial: boolean) {
+  const s = imperial ? secPerKm * 1.609344 : secPerKm;
+  return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 }

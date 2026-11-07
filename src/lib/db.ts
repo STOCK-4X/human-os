@@ -134,6 +134,7 @@ export function defaultProfile(): Profile {
     },
     aiEnabled: true,
     celebrations: "full",
+    zoneMethod: "hrmax",
     onboarded: false,
     createdAt: now,
     updatedAt: now,

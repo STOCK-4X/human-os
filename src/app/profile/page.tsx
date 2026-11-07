@@ -4,6 +4,7 @@ import { Download, RefreshCw, Upload } from "lucide-react";
 import { syncGarmin } from "@/lib/garmin-sync";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AppleHealthCard } from "@/components/AppleHealthCard";
 import { ACTIVITY_LABEL } from "@/components/forms/WorkoutForm";
 import { Card, Field, Loading, Notice, Page, Segmented, Sheet, Toggle, cx } from "@/components/ui";
@@ -138,6 +139,60 @@ function Settings({ data }: { data: DataSet }) {
           </div>
         </div>
       </Card>
+
+      <section id="performance" className="scroll-mt-6">
+        <Card title="Performance" action={<Link href="/evidence" className="text-xs font-semibold text-accent">Methods & evidence →</Link>}>
+          <div className="space-y-3">
+            <div>
+              <span className="label">Heart-rate zones</span>
+              <Segmented
+                label="Zone method"
+                value={p.zoneMethod ?? "hrmax"}
+                onChange={(zoneMethod) => set({ zoneMethod })}
+                options={[
+                  { value: "hrmax", label: "% HRmax" },
+                  { value: "hrr", label: "HR reserve" },
+                  { value: "lthr", label: "Threshold" },
+                ]}
+              />
+              <p className="mt-1 text-xs text-muted">HR reserve (Karvonen) uses your resting heart rate; Threshold (Friel) needs your lactate-threshold HR.</p>
+            </div>
+            <TextSetting
+              label="Lactate-threshold HR (bpm)"
+              type="number"
+              value={p.lthr?.toString() ?? ""}
+              onSave={(v) => set({ lthr: Number(v) >= 100 && Number(v) <= 220 ? Number(v) : undefined })}
+              placeholder="e.g. 168 — avg HR of the last 20 min of a 30-min hard solo effort"
+            />
+            <div className="border-t border-line pt-3">
+              <span className="label">Goal race</span>
+              <div className="grid grid-cols-2 gap-3">
+                <TextSetting label="Name" value={p.goalRace?.name ?? ""} onSave={(name) => set({ goalRace: name.trim() ? { date: p.goalRace?.date ?? "", ...p.goalRace, name: name.trim() } : undefined })} placeholder="e.g. Spring half" />
+                <Field label="Date">
+                  {(id) => <input id={id} type="date" className="input" value={p.goalRace?.date ?? ""} onChange={(e) => set({ goalRace: { name: p.goalRace?.name || "Goal race", ...p.goalRace, date: e.target.value } })} />}
+                </Field>
+              </div>
+              <Field label="Distance">
+                {(id) => (
+                  <select
+                    id={id}
+                    className="input mt-0"
+                    value={p.goalRace?.distanceKm ?? ""}
+                    onChange={(e) => set({ goalRace: { name: p.goalRace?.name || "Goal race", date: p.goalRace?.date ?? "", ...p.goalRace, distanceKm: e.target.value ? Number(e.target.value) : undefined } })}
+                  >
+                    <option value="">Other / not running</option>
+                    <option value="5">5 km</option>
+                    <option value="10">10 km</option>
+                    <option value="21.0975">Half marathon</option>
+                    <option value="42.195">Marathon</option>
+                  </select>
+                )}
+              </Field>
+              <p className="mt-1 text-xs text-muted">Train → Week then shows Base → Build → Peak → Taper with weekly load targets.</p>
+            </div>
+          </div>
+        </Card>
+      </section>
 
       <Card title="Show / hide metrics">
         {[
