@@ -111,6 +111,12 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 /* Big numbers: Sora, tight tracking (from direction B) */
 .num {
   font-family: var(--font-display);

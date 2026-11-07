@@ -92,14 +92,11 @@ export function Stat({
   const missing = value === undefined || value === null || value === "";
   return (
     <div className="min-w-0">
-      <div className="flex items-center gap-1.5">
-        <span className="truncate text-xs text-muted">{label}</span>
-        {!missing && source && <SourceBadge source={source} />}
-      </div>
-      <div className="mt-0.5 flex items-baseline gap-1">
+      <div className="text-xs leading-snug text-muted">{label}</div>
+      <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1">
         <span
           className={cx(
-            "tabular text-xl font-semibold tracking-tight",
+            "num text-xl leading-tight font-semibold",
             missing && "text-muted",
             tone === "good" && "text-good",
             tone === "warn" && "text-warn",
@@ -110,7 +107,12 @@ export function Stat({
         </span>
         {!missing && unit && <span className="text-xs text-muted">{unit}</span>}
       </div>
-      {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}
+      {(hint || (!missing && source)) && (
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-snug text-muted">
+          {!missing && source && <SourceBadge source={source} />}
+          {hint && <span>{hint}</span>}
+        </div>
+      )}
     </div>
   );
 }
@@ -150,7 +152,7 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className="flex rounded-xl bg-surface-2 p-1">
+    <div role="tablist" aria-label={label} className="no-scrollbar flex overflow-x-auto rounded-xl bg-surface-2 p-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -158,7 +160,7 @@ export function Segmented<T extends string>({
           aria-selected={value === o.value}
           onClick={() => onChange(o.value)}
           className={cx(
-            "min-h-9 flex-1 rounded-lg px-2 text-sm font-medium transition-colors",
+            "min-h-9 flex-1 shrink-0 rounded-lg px-2.5 text-[13px] font-medium whitespace-nowrap transition-colors",
             value === o.value ? "bg-surface text-ink shadow-sm" : "text-muted",
           )}
         >

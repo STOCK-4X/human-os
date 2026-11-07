@@ -10,17 +10,16 @@ import { SleepForm } from "@/components/forms/SleepForm";
 import { WorkoutForm, ACTIVITY_LABEL } from "@/components/forms/WorkoutForm";
 import { HabitList } from "@/components/HabitList";
 import { ReadinessCard, ScoreRings } from "@/components/ScoreRings";
+import { BodyToday, MorningBriefing, TrainingStatus } from "@/components/today/TodayPanels";
 import { SessionCard, planInput } from "@/components/train/SessionCard";
 import { weekSessions } from "@/lib/prescribe";
 import { Card, Empty, Loading, Page, Sheet, SourceBadge, Stat } from "@/components/ui";
-import { useDataSet, useNow } from "@/hooks/data";
+import { useDataSet, useNow, useOnline } from "@/hooks/data";
 import { buildBriefing } from "@/lib/briefing";
 import { addDays, clockOf, dayProgress, formatDay, formatDuration, formatInstant, todayKey } from "@/lib/date";
-import { metricBaseline, metricOn, sleepByDate, sleepInRange, type DataSet } from "@/lib/reports";
+import { metricOn, sleepByDate, sleepInRange, type DataSet } from "@/lib/reports";
 import { consistencyLabel, planSleep, sleepAmount, sleepConsistency, timeInBedMin } from "@/lib/sleep";
 import { scoreHistory, scoresFor } from "@/lib/scores";
-import { deviation } from "@/lib/stats";
-import type { MetricKey } from "@/lib/types";
 
 type SheetKind = "checkin" | "sleep" | "metrics" | "workout" | undefined;
 
@@ -51,6 +50,7 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
   const hidden = new Set(profile.hiddenMetrics);
   const workoutsToday = data.workouts.filter((w) => w.date === today);
   const close = () => setSheet(undefined);
+  const online = useOnline();
   const scores = scoresFor(data, today);
   const history = scoreHistory(data, addDays(today, -28), today);
   // No device data for today yet (watch not synced)? Show the latest complete day, clearly labelled.
@@ -71,24 +71,6 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
     }
   });
 
-  const recovery = (key: MetricKey, label: string, unit: string, minBand: number, goodWhen: "low" | "high") => {
-    if (hidden.has(key)) return null;
-    const p = metricOn(data.metrics, key, today);
-    const b = metricBaseline(data.metrics, key, today);
-    const dv = deviation(p?.value, b, minBand);
-    const off = (goodWhen === "low" && dv === "above") || (goodWhen === "high" && dv === "below");
-    return (
-      <Stat
-        key={key}
-        label={label}
-        value={p?.value}
-        unit={unit}
-        source={p?.source}
-        tone={off ? "warn" : undefined}
-        hint={b.status === "ok" ? `usual ${Math.round(b.low!)}–${Math.round(b.high!)}` : `baseline ${b.n}/${b.required} days`}
-      />
-    );
-  };
 
   const steps = metricOn(data.metrics, "steps", today) ?? metricOn(data.metrics, "steps", addDays(today, -1));
 
@@ -113,31 +95,36 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
       )}
       <ScoreRings scores={shownScores} history={shownHistory} profile={profile} />
       <ReadinessCard r={scores.readiness} />
+      <MorningBriefing data={data} today={today} online={online} />
       <TodaySession data={data} today={today} />
 
       {!checkin && !skipped && (
-        <div className="card flex items-center gap-3">
-          <button onClick={() => setSheet("checkin")} className="flex flex-1 items-center gap-3 text-left">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-accent-soft text-accent">
+        <div className="card">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
               <CalendarCheck size={20} />
             </span>
-            <span className="flex-1">
-              <span className="block font-medium">Morning energy check-in</span>
-              <span className="block text-sm text-muted">Three quick questions. Puts your wearable data in context.</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">Morning energy check-in</span>
+              <span className="block text-sm text-muted">Five quick sliders — puts your watch data in context and unlocks today&apos;s Energy and Readiness.</span>
             </span>
-            <ChevronRight size={18} className="text-muted" />
-          </button>
-          <button
-            className="btn-quiet min-h-9 px-2 text-xs"
-            onClick={() => {
-              try {
-                localStorage.setItem(`hos-checkin-skip:${today}`, "1");
-              } catch {}
-              setSkipped(true);
-            }}
-          >
-            Not today
-          </button>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button onClick={() => setSheet("checkin")} className="btn-primary flex-1">
+              Check in
+            </button>
+            <button
+              className="btn-quiet px-3"
+              onClick={() => {
+                try {
+                  localStorage.setItem(`hos-checkin-skip:${today}`, "1");
+                } catch {}
+                setSkipped(true);
+              }}
+            >
+              Not today
+            </button>
+          </div>
         </div>
       )}
 
@@ -151,6 +138,40 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
           <span className="text-xs">Edit</span>
         </button>
       )}
+
+      <TrainingStatus data={data} today={today} />
+      <BodyToday data={data} today={today} onEnter={() => setSheet("metrics")} />
+      <Card
+        title="Sleep"
+        action={
+          <button className="btn-quiet min-h-9 px-2 text-sm" onClick={() => setSheet("sleep")}>
+            {night ? "Edit" : <><Plus size={16} /> Log</>}
+          </button>
+        }
+      >
+        {night ? (
+          (() => {
+            const amt = sleepAmount(night, profile.sleepLatencyMin);
+            return (
+              <div className="grid grid-cols-3 gap-3">
+                <Stat label={amt.kind === "measured" ? "Asleep" : "Asleep (est.)"} value={formatDuration(amt.minutes)} source={amt.kind === "measured" ? night.source : "calculated"} />
+                <Stat label="In bed" value={formatDuration(timeInBedMin(night))} source="calculated" hint={`${formatInstant(night.bedtime, tz)}–${formatInstant(night.wakeTime, tz)}`} />
+                {!hidden.has("sleepScore") && night.score !== undefined ? (
+                  <Stat label="Sleep score" value={night.score} source={night.source} />
+                ) : (
+                  <Stat label="Quality" value={night.quality} unit="/5" source="manual" />
+                )}
+              </div>
+            );
+          })()
+        ) : (
+          <Empty title="No sleep logged for last night">Log it in a few seconds, or import from a file in Profile.</Empty>
+        )}
+        <p className="mt-3 text-xs text-muted">
+          7-night bedtime: {consistencyLabel(cons.bedtimeSdMin)}
+          {cons.bedtimeSdMin !== undefined && ` (±${Math.round(cons.bedtimeSdMin)} min, ${cons.nights} nights)`}
+        </p>
+      </Card>
 
       <section aria-label="Your day" className="card">
         <div className="flex justify-between text-xs text-muted tabular">
@@ -206,60 +227,7 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
         <LifestyleLogger profile={profile} date={today} logs={data.lifestyle} />
       </Card>
 
-      <details className="group">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-2xl px-1 text-sm font-semibold text-muted">
-          Sleep, body signals & activity
-          <ChevronRight size={18} className="transition-transform group-open:rotate-90" aria-hidden />
-        </summary>
-        <div className="mt-2 space-y-4">
-      <Card
-        title="Sleep"
-        action={
-          <button className="btn-quiet min-h-9 px-2 text-sm" onClick={() => setSheet("sleep")}>
-            {night ? "Edit" : <><Plus size={16} /> Log</>}
-          </button>
-        }
-      >
-        {night ? (
-          (() => {
-            const amt = sleepAmount(night, profile.sleepLatencyMin);
-            return (
-              <div className="grid grid-cols-3 gap-3">
-                <Stat label={amt.kind === "measured" ? "Asleep" : "Asleep (est.)"} value={formatDuration(amt.minutes)} source={amt.kind === "measured" ? night.source : "calculated"} />
-                <Stat label="In bed" value={formatDuration(timeInBedMin(night))} source="calculated" hint={`${formatInstant(night.bedtime, tz)}–${formatInstant(night.wakeTime, tz)}`} />
-                {!hidden.has("sleepScore") && night.score !== undefined ? (
-                  <Stat label="Sleep score" value={night.score} source={night.source} />
-                ) : (
-                  <Stat label="Quality" value={night.quality} unit="/5" source="manual" />
-                )}
-              </div>
-            );
-          })()
-        ) : (
-          <Empty title="No sleep logged for last night">Log it in a few seconds, or import from a file in Profile.</Empty>
-        )}
-        <p className="mt-3 text-xs text-muted">
-          7-night bedtime: {consistencyLabel(cons.bedtimeSdMin)}
-          {cons.bedtimeSdMin !== undefined && ` (±${Math.round(cons.bedtimeSdMin)} min, ${cons.nights} nights)`}
-        </p>
-      </Card>
 
-      <Card
-        title="Body signals"
-        action={
-          <button className="btn-quiet min-h-9 px-2 text-sm" onClick={() => setSheet("metrics")}>
-            Enter
-          </button>
-        }
-      >
-        <div className="grid grid-cols-2 gap-4">
-          {recovery("hrv", "HRV", "ms", 4, "high")}
-          {recovery("rhr", "Resting HR", "bpm", 3, "low")}
-          {recovery("bodyBattery", "Body Battery", "", 10, "high")}
-          {recovery("stress", "Stress", "", 8, "low")}
-        </div>
-        <p className="mt-3 text-xs text-muted">Wearable scores are device estimates. Compared with your own recent range, not universal norms.</p>
-      </Card>
 
       <Card
         title="Activity"
@@ -275,8 +243,6 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
           <Stat label="Sessions" value={workoutsToday.length || undefined} hint={workoutsToday.map((w) => ACTIVITY_LABEL[w.type]).join(", ") || undefined} source="manual" />
         </div>
       </Card>
-        </div>
-      </details>
 
       <div className="grid grid-cols-3 gap-2">
         <Link href="/review" className="btn-ghost px-2">Review</Link>

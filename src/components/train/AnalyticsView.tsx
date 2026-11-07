@@ -89,11 +89,11 @@ export function AnalyticsView({ data, today }: { data: DataSet; today: DayKey })
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="space-y-2">
         <div className="text-xs text-muted">
           Training · last workout {lastWorkout ? formatDay(lastWorkout.date, "d MMM") : "—"}
         </div>
-        <div className="w-56">
+        <div>
           <Segmented
             label="Range"
             value={range}
