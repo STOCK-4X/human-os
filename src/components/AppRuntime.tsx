@@ -9,6 +9,7 @@ import { requestPersistence } from "@/lib/db";
 import { todayKey } from "@/lib/date";
 import { dueReminders, showNotification } from "@/lib/notifications";
 import { syncInbox } from "@/lib/inbox-sync";
+import { syncGarmin } from "@/lib/garmin-sync";
 
 import { THEME_KEY, resolveTheme } from "@/lib/theme";
 import { Celebration } from "./achievements/Celebration";
@@ -28,12 +29,16 @@ export function AppRuntime() {
     void requestPersistence();
   }, []);
 
-  // Apple Health inbox: collect on open, when back online, and every 15 minutes.
+  // Garmin + Apple Health inbox: pull on open, when back online, and every 30 minutes.
   const token = profile?.onboarded ? profile.coachToken : undefined;
   useEffect(() => {
     if (!token || !online) return;
-    void syncInbox(token);
-    const t = setInterval(() => void syncInbox(token), 15 * 60_000);
+    const run = () => {
+      void syncGarmin(token);
+      void syncInbox(token);
+    };
+    run();
+    const t = setInterval(run, 30 * 60_000);
     return () => clearInterval(t);
   }, [token, online]);
 

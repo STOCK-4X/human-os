@@ -91,7 +91,8 @@ Because data is local-first, each device has its own data until cloud sync ships
 
 ## Platform notes
 
-- **Garmin:** not connected. The program is business-only and applications are paused. See [docs/GARMIN.md](docs/GARMIN.md).
+- **Garmin:** synced through Garmin's official Personal API, server-side. See [docs/GARMIN.md](docs/GARMIN.md). Apple Health via Shortcuts is an alternative: [docs/APPLE_HEALTH.md](docs/APPLE_HEALTH.md).
+- **Training analytics:** fitness/fatigue/form, load flag, zones and PRs. See [docs/ANALYTICS.md](docs/ANALYTICS.md).
 - **Notifications:** foreground and recent-background only for now. On iOS they require the installed PWA. See [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md).
 - **Scores:** full method in [docs/SCORES.md](docs/SCORES.md).
 - **PWA:** the service worker (`public/sw.js`) caches the app shell. It is network-first for pages, cache-first for hashed assets, and never caches `/api`. User data lives in IndexedDB, and the app requests persistent storage so the browser won't evict it.
@@ -109,5 +110,5 @@ Because data is local-first, each device has its own data until cloud sync ships
    - Supabase Auth and sync of the IndexedDB tables, using `updatedAt` last-write-wins plus an outbox
    - Device migration via import
 2. **Web Push** for background reminders (VAPID + scheduled job).
-3. **Garmin live sync** once Garmin approves an application, plus a parser for Garmin's full JSON data export.
+3. **More Garmin data:** Body Battery curve, SpO₂, weight and .FIT files from the Personal API.
 4. **More tests:** Playwright end-to-end tests for core flows, and accessibility audits.

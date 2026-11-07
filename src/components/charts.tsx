@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
+  ComposedChart,
+  Legend,
   CartesianGrid,
   Line,
   LineChart,
@@ -148,6 +150,33 @@ export function RelationChart({ points, xLabel, yLabel }: { points: { x: number;
           <Tooltip cursor={{ stroke: t.line }} contentStyle={{ background: t.surface, border: `1px solid ${t.line}`, color: t.ink, fontSize: 12, borderRadius: 8 }} />
           <Scatter data={points} fill={t.chart2} isAnimationActive={false} />
         </ScatterChart>
+      </ResponsiveContainer>
+    </figure>
+  );
+}
+
+/** Fitness (CTL) and Fatigue (ATL) lines with Form (TSB) bars. */
+export function PmcChart({ data, height = 220 }: { data: { date: string; ctl: number; atl: number; tsb: number }[]; height?: number }) {
+  const t = useTokens();
+  const axis = { stroke: t.muted, fontSize: 11, tickLine: false, axisLine: false } as const;
+  return (
+    <figure aria-label="Fitness, fatigue and form over time" className="-mx-1">
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke={t.line} strokeDasharray="3 3" />
+          <XAxis dataKey="date" tickFormatter={short} {...axis} minTickGap={28} />
+          <YAxis {...axis} width={32} />
+          <ReferenceLine y={0} stroke={t.line} />
+          <Tooltip
+            labelFormatter={(l) => formatDay(String(l), "EEE d MMM")}
+            formatter={(v, name) => [Math.round(Number(v)), name]}
+            contentStyle={{ background: t.surface, border: `1px solid ${t.line}`, color: t.ink, fontSize: 12, borderRadius: 8 }}
+          />
+          <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, color: t.muted }} />
+          <Bar dataKey="tsb" name="Form" fill={t.line} maxBarSize={6} isAnimationActive={false} />
+          <Line dataKey="atl" name="Fatigue" stroke={t.chart2} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+          <Line dataKey="ctl" name="Fitness" stroke={t.accent} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+        </ComposedChart>
       </ResponsiveContainer>
     </figure>
   );

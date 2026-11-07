@@ -1,42 +1,59 @@
-# Garmin integration — status and path to enable
+# Garmin integration — Garmin Connect Personal API
 
-## Current status (checked October 2026)
+Human OS syncs directly from Garmin using Garmin's **official Personal API**, a self-service option for individuals launched in October 2026. There is no scraping, Garmin password, or third party involved.
 
-**There is no live Garmin connection in Human OS.** The app labels it "Not connected" everywhere.
+## Setup
+1. **Create a key.** Garmin Connect (web) → Settings → **Personal API Key**: https://connect.garmin.com/app/settings/personalApiToken
+   - Choose an expiry (up to 1 year).
+   - The key is shown once. Garmin emails you about a week before it expires.
+2. **Add it to the server.** Vercel → Settings → Environment Variables: `GARMIN_PERSONAL_API_KEY` = the key (Production). Then redeploy.
+   - The key stays server-side and never reaches the browser.
+   - Garmin's API sends no CORS headers, so it can't be called from a browser anyway.
+3. **Add the access token in the app.** Profile → Apple Health → **Server access token**: the same value as `COACH_ACCESS_TOKEN`. Garmin should then show **Connected**.
 
-- The Garmin Connect Developer Program (Health API, Activity API) is the only authorised route to sync data from Garmin's servers.
-- **It accepts business applicants only.** Individual and personal-use applications are declined.
-- **New applications are currently paused** while Garmin updates the program. Check https://developer.garmin.com/gc-developer-program/ for the current state.
-- Approved partners get an evaluation environment first. Auth is OAuth 2.0 with PKCE (older OAuth 1.0a material still circulates; confirm the method with Garmin when approved). Data arrives as push/ping notifications to your server.
+## How it works
+- **Server** (`src/lib/server/garmin.ts`)
+  - Exchanges the key at `POST https://personal.connectapi.garmin.com/personalapitoken-service/personal-api/personal-api-key/token` (`Authorization: ApiKey <key>`) for a 24-hour bearer JWT.
+  - Caches the JWT in memory and refreshes it an hour before expiry.
+- **Route** `GET /api/garmin/sync?start&end` (≤31 days, requires the access token)
+  - Pulls Garmin data for the range and maps it into app records with `src/lib/garmin-map.ts`.
+  - Nothing is stored on the server.
+- **App** (`src/lib/garmin-sync.ts`)
+  - Backfills 365 days on first sync, in 30-day chunks.
+  - After that, refreshes from 3 days before the last sync.
+  - Runs on open, when back online and every 30 minutes, plus a **Sync Garmin now** button.
+  - Upserts by unique key: re-syncing never duplicates, and your own effort ratings and notes on activities are kept.
 
-Human OS never scrapes Garmin Connect, never asks for your Garmin password, and never stores Garmin tokens in the browser.
+## Data mapped
 
-## What works today
+| Endpoint | Stored as |
+|---|---|
+| `/usersummary-service/v2/dailysummaries` | steps, resting HR, active calories, intensity minutes, average stress (negative "no data" values ignored), Body Battery daily high |
+| `/sleep-service/sleep/dailySleepSummariesByDate` | sleep window, time asleep, deep/light/REM/awake, awakenings, **Garmin sleep score** (shown separately from the Human OS score), overnight breathing rate |
+| `/hrv-service/hrv/daily/{start}/{end}` | last-night HRV average |
+| `/activitylist-service/activities/search/activities` | activities: type, time, duration, distance, avg/max HR, cadence, ascent, calories, HR-zone seconds, training effect, fastest 1k/mile/5k/10k |
 
-1. **Garmin activities CSV.** In Garmin Connect (web): Activities → All Activities → Export CSV. Import it in Profile → Data sources. Runs, walks, rides, swims and strength sessions are mapped, with distance, time, HR, cadence and ascent. The `--` placeholders are treated as missing, never zero. Re-importing never duplicates (unique external id per activity).
-2. **Sleep / daily metrics.** Garmin has no CSV export for sleep, HRV or Body Battery. Use the Human OS templates (Profile → Data sources → template buttons) to enter them in bulk, or the quick manual entry on Today.
-3. **Garmin's full data export** (account settings → Export your data) produces JSON. A parser for it is a sensible next step. It is not implemented yet because its format must be verified against a real export before shipping.
+Values are labelled **Garmin** and used exactly as Garmin reports them.
 
-Imported values are labelled **Imported** (source `csv`), never **Garmin**, because they did not come through an authorised live connection.
+**Deliberately not stored:**
+- GPS coordinates
+- location names
+- owner name and profile photos
 
-## Architecture for the live integration
+## Terms
+- The Personal API is for personal use: your own data, not commercial multi-user apps.
+- Deleting the key in Garmin Connect immediately revokes access. The app then shows the error and stops syncing.
 
-`src/lib/integrations/garmin.ts` defines:
-- `garminServerStatus()` reports honest state: `not_configured` → `configured_not_connected` → `connected`.
-- `HealthProviderMapper` is the contract a real adapter must satisfy: map provider summaries into `SleepRecord`, `DailyMetric` and `Workout` with `source: "garmin"` and a stable `externalId`.
+## Other Garmin endpoints available, not yet used
+These exist but aren't used yet:
+- detailed Body Battery curve
+- stress detail
+- SpO₂
+- weight
+- hydration
+- menstrual cycle
+- fitness age
+- heart-rate zones
+- `.FIT` downloads
 
-## Steps once Garmin approves an application
-
-1. Register the app and set `GARMIN_CLIENT_ID`, `GARMIN_CLIENT_SECRET` and `GARMIN_REDIRECT_URI` on the server.
-2. Enable Supabase Auth and apply `supabase/migrations/0001_init.sql`. Tokens go in `integration_tokens`, which has RLS and no client policy, so only the service role can read it. Encrypt tokens at rest.
-3. Add server routes:
-   - `GET /api/integrations/garmin/authorize`: create the PKCE verifier, store it server-side, redirect.
-   - `GET /api/integrations/garmin/callback`: exchange the code, store the tokens, record a `sync_logs` row.
-   - `POST /api/integrations/garmin/webhook`: verify the notification, fetch summaries, map them with a `HealthProviderMapper`, upsert on the unique keys.
-4. Request only the scopes needed (sleep, dailies, HRV, activities).
-5. Handle delayed and partial data. Garmin can redeliver or update summaries, so upsert rather than insert, and never zero-fill missing fields.
-6. Test against the evaluation environment, then flip the UI status to `connected` only when a real sync has succeeded. Show the last successful sync time and a manual refresh where the API allows it.
-
-## Alternatives if you can't get access
-
-Aggregators (Terra, Rook, Open Wearables, and others) hold Garmin partner access and resell it under their terms. Review their privacy terms carefully before sending health data through a third party.
+See [garmin/connect-personal-api-python](https://github.com/garmin/connect-personal-api-python).

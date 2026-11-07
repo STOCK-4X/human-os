@@ -1,3 +1,4 @@
+import { loadFlag } from "./analytics";
 import { addDays, clockOf, clockToMin, dayRange } from "./date";
 import { type DataSet, metricBaseline, metricOn, sleepByDate, sleepInRange } from "./reports";
 import { sleepAmount, timeInBedMin } from "./sleep";
@@ -334,6 +335,7 @@ export function readiness(data: DataSet, day: DayKey, s = { sleep: sleepScore(da
   if (symptoms.includes("unusualFatigue")) lows.push("unusual fatigue");
   const yesterday = addDays(day, -1);
   if (data.workouts.some((w) => w.date === yesterday && ((w.rpe ?? 0) >= 8 || w.durationMin >= 90))) lows.push("a hard session yesterday");
+  if (loadFlag(data.workouts, day).band === "high") lows.push("a sharp jump in training load this week");
 
   const sources = [recovery.status === "ok", s.sleep.status === "ok", ck !== undefined && (ck.energy !== undefined || ck.fatigue !== undefined)].filter(Boolean).length;
   if (sources === 0) return mk("insufficient", ["no recovery, sleep or check-in data today"]);

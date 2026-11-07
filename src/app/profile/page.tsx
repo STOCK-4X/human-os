@@ -1,6 +1,7 @@
 "use client";
 
-import { Download, Upload } from "lucide-react";
+import { Download, RefreshCw, Upload } from "lucide-react";
+import { syncGarmin } from "@/lib/garmin-sync";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useMemo, useState } from "react";
 import { AppleHealthCard } from "@/components/AppleHealthCard";
@@ -237,6 +238,9 @@ function Integrations() {
   const [result, setResult] = useState<ImportOutcome>();
   const [busy, setBusy] = useState(false);
   const logs = useLiveQuery(() => db.syncLogs.orderBy("at").reverse().limit(5).toArray(), []);
+  const lastGarmin = useLiveQuery(() => db.syncLogs.where("provider").equals("garmin").last(), []);
+  const [gBusy, setGBusy] = useState(false);
+  const [gMsg, setGMsg] = useState<string>();
   const profile = useLiveQuery(() => db.profile.get("me"), []);
   useEffect(() => {
     fetch("/api/integrations/garmin/status")
@@ -262,10 +266,32 @@ function Integrations() {
       <div className="rounded-xl border border-line p-3">
         <div className="flex items-center justify-between">
           <span className="font-medium">Garmin Connect</span>
-          <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted">{garmin ? (garmin.state === "connected" ? "Connected" : "Not connected") : "Checking…"}</span>
+          <span className={cx("rounded-full px-2 py-0.5 text-xs", garmin?.state === "connected" ? "bg-good/15 text-good" : "bg-surface-2 text-muted")}>
+            {garmin ? (garmin.state === "connected" ? "Connected" : garmin.state === "error" ? "Problem" : "Not connected") : "Checking…"}
+          </span>
         </div>
         <p className="mt-1 text-sm text-muted">{garmin?.message}</p>
-        <p className="mt-1 text-xs text-muted">Human OS will never ask for your Garmin password. See docs/GARMIN.md for the official enablement path.</p>
+        {garmin?.state === "connected" && (
+          <>
+            <button
+              className="btn-ghost mt-2 w-full"
+              disabled={gBusy || !profile?.coachToken}
+              onClick={async () => {
+                setGBusy(true);
+                const r = await syncGarmin(profile?.coachToken, undefined, setGMsg);
+                setGMsg(r.message);
+                setGBusy(false);
+              }}
+            >
+              <RefreshCw size={16} className={gBusy ? "animate-spin" : ""} /> Sync Garmin now
+            </button>
+            {!profile?.coachToken && <p className="mt-1 text-xs text-warn">Add the server access token (Apple Health card above) to sync.</p>}
+          </>
+        )}
+        {gMsg && <p className="mt-1 text-xs text-muted">{gMsg}</p>}
+        <p className="mt-1 text-xs text-muted">
+          Last sync: {lastGarmin ? `${formatInstant(lastGarmin.at, profile?.timeZone ?? "UTC", "d MMM HH:mm")} · ${lastGarmin.message}` : "never"}. Uses Garmin&apos;s official Personal API; your key stays on the server.
+        </p>
       </div>
 
       <div className="mt-4">

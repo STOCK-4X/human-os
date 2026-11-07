@@ -155,6 +155,13 @@ export interface Workout {
   /** Rate of perceived exertion 1–10. */
   rpe?: number;
   sets?: StrengthSet[];
+  /** Seconds in heart-rate zones 1–5 (from the device). */
+  hrZonesSec?: number[];
+  /** Device training effect, 0–5. */
+  aerobicTE?: number;
+  anaerobicTE?: number;
+  /** Fastest splits within this activity, in seconds. */
+  bestSplitsSec?: { k1?: number; mi?: number; k5?: number; k10?: number };
   notes?: string;
   source: Source;
   externalId?: string;

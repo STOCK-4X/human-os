@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { TrendChart } from "@/components/charts";
+import { AnalyticsView } from "@/components/train/AnalyticsView";
 import { ACTIVITY_LABEL, WorkoutForm } from "@/components/forms/WorkoutForm";
 import { Card, Empty, Loading, Notice, Page, Segmented, Sheet, SourceBadge, Stat, cx } from "@/components/ui";
 import { useDataSet, useToday } from "@/hooks/data";
@@ -36,7 +37,7 @@ export default function TrainPage() {
 }
 
 function Train({ data, today, onEdit }: { data: DataSet; today: DayKey; onEdit: (w: Workout) => void }) {
-  const [view, setView] = useState<"plan" | "run" | "strength" | "history">("plan");
+  const [view, setView] = useState<"analytics" | "plan" | "run" | "strength" | "history">("analytics");
   const { profile } = data;
   const brief = buildBriefing(data, today);
   const plan = weeklyPlan(profile, today);
@@ -63,12 +64,15 @@ function Train({ data, today, onEdit }: { data: DataSet; today: DayKey; onEdit: 
         value={view}
         onChange={setView}
         options={[
+          { value: "analytics", label: "Analytics" },
           { value: "plan", label: "Week" },
           { value: "run", label: "Running" },
           { value: "strength", label: "Strength" },
           { value: "history", label: "History" },
         ]}
       />
+
+      {view === "analytics" && <AnalyticsView data={data} today={today} />}
 
       {view === "plan" && (
         <>
