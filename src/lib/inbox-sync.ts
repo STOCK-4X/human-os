@@ -53,7 +53,10 @@ export async function syncInbox(token: string | undefined, database: HumanOsDb =
     const res = await fetch("/api/inbox", { headers, cache: "no-store" });
     if (res.status === 503) return { status: "not_configured", imported: 0, message: "Apple Health inbox isn't configured on the server yet." };
     if (res.status === 401) return { status: "unauthorized", imported: 0, message: "Access token is wrong." };
-    if (!res.ok) return { status: "error", imported: 0, message: `Server error (${res.status}).` };
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      return { status: "error", imported: 0, message: j.message ? `${j.message} (${res.status})` : `Server error (${res.status}).` };
+    }
     const { items } = (await res.json()) as { items: { id: string; payload: unknown }[] };
     if (!items.length) return { status: "empty", imported: 0, message: "No new Apple Health data." };
 

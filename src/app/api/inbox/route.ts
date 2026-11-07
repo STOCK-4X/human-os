@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { HealthPayloadSchema } from "@/lib/inbox";
-import { deleteItems, inboxConfigured, listItems, purgeOld, putItem, tokenOk } from "@/lib/server/inbox-store";
+import { StorageError, deleteItems, inboxConfigured, listItems, purgeOld, putItem, tokenOk } from "@/lib/server/inbox-store";
 
 /**
  * Apple Health inbox.
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id });
   } catch (e) {
     console.error("inbox put failed", e);
-    return NextResponse.json({ error: "storage", message: "Couldn't store the data." }, { status: 502 });
+    return NextResponse.json({ error: "storage", message: e instanceof StorageError ? e.hint : "Couldn't store the data." }, { status: 502 });
   }
 }
 
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ items: await listItems() });
   } catch (e) {
     console.error("inbox list failed", e);
-    return NextResponse.json({ error: "storage", message: "Couldn't read the inbox." }, { status: 502 });
+    return NextResponse.json({ error: "storage", message: e instanceof StorageError ? e.hint : "Couldn't read the inbox." }, { status: 502 });
   }
 }
 

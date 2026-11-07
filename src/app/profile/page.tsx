@@ -239,6 +239,12 @@ function Integrations() {
   const [busy, setBusy] = useState(false);
   const logs = useLiveQuery(() => db.syncLogs.orderBy("at").reverse().limit(5).toArray(), []);
   const lastGarmin = useLiveQuery(() => db.syncLogs.where("provider").equals("garmin").last(), []);
+  const garminHistory = useLiveQuery(async () => {
+    const days = await db.metrics.where("date").above("0").filter((m) => m.source === "garmin").toArray();
+    const workouts = await db.workouts.filter((w) => w.source === "garmin").count();
+    const dates = [...new Set(days.map((m) => m.date))].sort();
+    return { days: dates.length, from: dates[0], workouts };
+  }, []);
   const [gBusy, setGBusy] = useState(false);
   const [gMsg, setGMsg] = useState<string>();
   const profile = useLiveQuery(() => db.profile.get("me"), []);
@@ -289,6 +295,11 @@ function Integrations() {
           </>
         )}
         {gMsg && <p className="mt-1 text-xs text-muted">{gMsg}</p>}
+        {garminHistory && garminHistory.days > 0 && (
+          <p className="mt-1 text-xs text-muted">
+            In the app: {garminHistory.days} days since {formatInstant(`${garminHistory.from}T12:00:00Z`, "UTC", "d MMM yyyy")} · {garminHistory.workouts} activities
+          </p>
+        )}
         <p className="mt-1 text-xs text-muted">
           Last sync: {lastGarmin ? `${formatInstant(lastGarmin.at, profile?.timeZone ?? "UTC", "d MMM HH:mm")} · ${lastGarmin.message}` : "never"}. Uses Garmin&apos;s official Personal API; your key stays on the server.
         </p>
