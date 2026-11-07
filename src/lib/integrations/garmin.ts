@@ -17,7 +17,7 @@ export interface ProviderStatus {
 
 /** Live check: only reports "connected" if Garmin actually issues a token. */
 export async function garminServerStatus(): Promise<ProviderStatus> {
-  const { garminKeyConfigured, garminToken } = await import("../server/garmin");
+  const { garminKeyConfigured, garminPing } = await import("../server/garmin");
   if (!garminKeyConfigured()) {
     return {
       provider: "garmin",
@@ -26,7 +26,7 @@ export async function garminServerStatus(): Promise<ProviderStatus> {
     };
   }
   try {
-    await garminToken();
+    await garminPing();
     return { provider: "garmin", state: "connected", message: "Connected through Garmin's official Personal API." };
   } catch (e) {
     return { provider: "garmin", state: "error", message: (e as Error).message };

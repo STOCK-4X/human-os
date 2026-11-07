@@ -67,6 +67,12 @@ async function get(path: string, retry = true): Promise<unknown> {
   return text ? JSON.parse(text) : null;
 }
 
+/** Proves the key works end-to-end with one tiny data call (not just a cached token). */
+export async function garminPing(): Promise<void> {
+  const d = new Date().toISOString().slice(0, 10);
+  await get(`/usersummary-service/stats/steps/daily/${d}/${d}`);
+}
+
 /** Fetch and map one inclusive date range (keep it ≤ 31 days per call). */
 export async function fetchGarminRange(start: string, end: string): Promise<GarminRecords> {
   const out = emptyGarmin();
