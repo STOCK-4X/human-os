@@ -53,6 +53,16 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
   const close = () => setSheet(undefined);
   const scores = scoresFor(data, today);
   const history = scoreHistory(data, addDays(today, -28), today);
+  // No device data for today yet (watch not synced)? Show the latest complete day, clearly labelled.
+  const noneToday = [scores.sleep, scores.recovery, scores.energy].every((s) => s.status !== "ok");
+  const fallbackDay = noneToday
+    ? [1, 2, 3].map((n) => addDays(today, -n)).find((d) => {
+        const s = scoresFor(data, d);
+        return s.sleep.status === "ok" || s.recovery.status === "ok";
+      })
+    : undefined;
+  const shownScores = fallbackDay ? scoresFor(data, fallbackDay) : scores;
+  const shownHistory = fallbackDay ? scoreHistory(data, addDays(fallbackDay, -28), fallbackDay) : history;
   const [skipped, setSkipped] = useState(() => {
     try {
       return localStorage.getItem(`hos-checkin-skip:${today}`) === "1";
@@ -94,7 +104,14 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
         </Link>
       }
     >
-      <ScoreRings scores={scores} history={history} profile={profile} />
+      {noneToday && (
+        <div className="rounded-2xl border border-warn/30 bg-warn/10 px-4 py-3 text-sm">
+          <strong>No watch data for today yet.</strong>{" "}
+          {fallbackDay ? `Showing ${formatDay(fallbackDay, "EEEE d MMM")} instead. ` : ""}
+          Open the Garmin Connect app so your watch syncs — Human OS picks it up automatically. The morning check-in also gives you an Energy score now.
+        </div>
+      )}
+      <ScoreRings scores={shownScores} history={shownHistory} profile={profile} />
       <ReadinessCard r={scores.readiness} />
       <TodaySession data={data} today={today} />
 
