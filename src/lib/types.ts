@@ -86,7 +86,9 @@ export type MetricKey =
   | "steps"
   | "activeMin"
   | "calories"
-  | "respiration";
+  | "respiration"
+  /** Average overnight blood-oxygen saturation, %. */
+  | "spo2";
 
 export interface DailyMetric {
   id?: number;
@@ -142,6 +144,8 @@ export interface StrengthSet {
   reps: number;
   weightKg?: number;
   restSec?: number;
+  /** Reps in reserve at the end of the set (0 = failure). */
+  rir?: number;
 }
 
 export interface Workout {
@@ -159,6 +163,8 @@ export interface Workout {
   calories?: number;
   /** Rate of perceived exertion 1–10. */
   rpe?: number;
+  /** A race or all-out time trial — used first for VDOT. */
+  isRace?: boolean;
   sets?: StrengthSet[];
   /** Seconds in heart-rate zones 1–5 (from the device). */
   hrZonesSec?: number[];
@@ -244,6 +250,10 @@ export interface CheckIn {
   /** Mental focus. */
   focus?: number;
   mood?: number;
+  /** Muscle soreness 1–10 (Hooper-style wellness). */
+  soreness?: number;
+  /** Life/mental stress 1–10. */
+  stress?: number;
   /** "Do I feel unusually unwell?" — optional. */
   unwell?: boolean;
   intention?: string;
@@ -410,4 +420,20 @@ export interface CustomAchievement {
   target?: number;
   completedOn?: DayKey;
   createdAt: string;
+}
+
+export interface Condition {
+  id?: number;
+  kind: "injury" | "illness";
+  label: string;
+  bodyPart?: string;
+  /** 1 = minor (training modified), 2 = moderate (some sessions missed), 3 = severe (no training). */
+  severity: 1 | 2 | 3;
+  start: DayKey;
+  end?: DayKey;
+  /** For illness: symptoms below the neck (fever, chest, body aches) vs only above (runny nose, mild sore throat). */
+  belowNeck?: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }

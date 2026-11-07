@@ -15,6 +15,7 @@ export const METRIC_META: Record<Exclude<MetricKey, "hrvStatus">, { label: strin
   activeMin: { label: "Active minutes", unit: "min" },
   calories: { label: "Calories", unit: "kcal" },
   respiration: { label: "Respiration", unit: "br/min" },
+  spo2: { label: "SpO₂ (overnight)", unit: "%" },
 };
 type Key = keyof typeof METRIC_META;
 

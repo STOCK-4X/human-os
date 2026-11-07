@@ -62,25 +62,51 @@ export function trainingPaces(v: number): Pace[] {
 
 export interface VdotEstimate {
   vdot: number;
+  /** "race" = a logged race or time trial (most reliable); "split" = fastest segment of a training run. */
+  basis: "race" | "split";
   from: { label: string; date: DayKey; timeSec: number; distanceM: number };
 }
 
-/**
- * Best VDOT from fastest 5 km / 10 km efforts in the last `days` days.
- * Splits from training runs underestimate race fitness, so this is a floor.
- */
-export function bestVdot(workouts: Workout[], today: DayKey, days = 180): VdotEstimate | undefined {
-  let best: VdotEstimate | undefined;
+function candidates(workouts: Workout[], from: DayKey, to: DayKey): VdotEstimate[] {
+  const out: VdotEstimate[] = [];
   for (const w of workouts) {
-    if (w.type !== "run" || !w.bestSplitsSec || daysBetween(w.date, today) > days) continue;
+    if (w.type !== "run" || w.date < from || w.date > to) continue;
+    if (w.isRace && w.distanceKm && w.distanceKm >= 1.5) {
+      const m = w.distanceKm * 1000;
+      out.push({ vdot: vdot(m, w.durationMin * 60), basis: "race", from: { label: `${w.distanceKm.toFixed(1)} km race`, date: w.date, timeSec: w.durationMin * 60, distanceM: m } });
+    }
     for (const [k, m, label] of [["k5", 5000, "5 km"], ["k10", 10000, "10 km"]] as const) {
-      const t = w.bestSplitsSec[k];
-      if (!t) continue;
-      const v = vdot(m, t);
-      if (v > 20 && v < 90 && (!best || v > best.vdot)) best = { vdot: v, from: { label, date: w.date, timeSec: t, distanceM: m } };
+      const t = w.bestSplitsSec?.[k];
+      if (t) out.push({ vdot: vdot(m, t), basis: "split", from: { label, date: w.date, timeSec: t, distanceM: m } });
     }
   }
+  return out.filter((c) => c.vdot > 20 && c.vdot < 90);
+}
+
+/**
+ * Current VDOT: the best race in the window if you've raced; otherwise the best
+ * 5 km / 10 km segment of a training run (a conservative floor).
+ */
+export function bestVdot(workouts: Workout[], today: DayKey, days = 180): VdotEstimate | undefined {
+  const c = candidates(workouts, addDays(today, -days), today);
+  const races = c.filter((x) => x.basis === "race");
+  const pool = races.length ? races : c;
+  const best = pool.reduce<VdotEstimate | undefined>((a, x) => (!a || x.vdot > a.vdot ? x : a), undefined);
   return best && { ...best, vdot: Math.round(best.vdot * 10) / 10 };
+}
+
+/** Best VDOT per calendar month over the last `months` months (gaps where you didn't run fast). */
+export function vdotHistory(workouts: Workout[], today: DayKey, months = 12): { date: DayKey; value?: number }[] {
+  const out: { date: DayKey; value?: number }[] = [];
+  const [y, m] = today.split("-").map(Number);
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1));
+    const start = d.toISOString().slice(0, 10);
+    const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+    const best = candidates(workouts, start, end).reduce((a, x) => Math.max(a, x.vdot), 0);
+    out.push({ date: start, value: best ? Math.round(best * 10) / 10 : undefined });
+  }
+  return out;
 }
 
 export const RACES = [

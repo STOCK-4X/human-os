@@ -43,8 +43,8 @@ export async function garminToken(force = false): Promise<string> {
     headers: { Accept: "*/*", Authorization: `ApiKey ${key}` },
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (res.status === 401 || res.status === 403)
-    throw new GarminError("Garmin rejected the personal API key (expired or deleted?). Create a new one in Garmin Connect.", 401);
+  if (res.status === 401 || res.status === 403 || res.status === 404)
+    throw new GarminError("Garmin says this Personal API key no longer exists or has expired. Create a new key in Garmin Connect and update GARMIN_PERSONAL_API_KEY.", 424);
   if (!res.ok) throw new GarminError(`Garmin token request failed (${res.status}).`, 502);
   const token = (await res.text()).trim();
   cached = { token, expiresAt: jwtExp(token) };

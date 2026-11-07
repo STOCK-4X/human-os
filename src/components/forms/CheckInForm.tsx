@@ -65,6 +65,8 @@ export function CheckInForm({ date, existing, onDone }: { date: DayKey; existing
       <Scale label="How energetic do you feel?" low="empty" high="full of energy" value={c.energy} onChange={(energy) => set({ energy })} />
       <Scale label="How physically tired do you feel?" low="fresh" high="exhausted" value={c.fatigue} onChange={(fatigue) => set({ fatigue })} />
       <Scale label="How mentally focused do you feel?" low="foggy" high="sharp" value={c.focus} onChange={(focus) => set({ focus })} />
+      <Scale label="Muscle soreness" low="none" high="very sore" value={c.soreness} onChange={(soreness) => set({ soreness })} />
+      <Scale label="Stress" low="calm" high="overwhelmed" value={c.stress} onChange={(stress) => set({ stress })} />
       <Toggle label="I feel unusually unwell" hint="Optional. Takes priority over any wearable score." checked={Boolean(c.unwell)} onChange={(unwell) => set({ unwell })} />
       {c.unwell && <Notice tone="warn">Take it easy today. If symptoms are severe, sudden or getting worse, contact a health professional.</Notice>}
 

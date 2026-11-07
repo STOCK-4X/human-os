@@ -315,6 +315,15 @@ export function readiness(data: DataSet, day: DayKey, s = { sleep: sleepScore(da
   const symptoms = ck?.symptoms ?? [];
   const mk = (level: ReadinessLevel, reasons: string[], extra: Partial<Readiness> = {}): Readiness => ({ level, ...READINESS_COPY[level], reasons, symptomDriven: false, ...extra });
 
+  const active = (data.conditions ?? []).filter((c) => c.start <= day && (!c.end || c.end >= day));
+  const ill = active.find((c) => c.kind === "illness");
+  if (ill && (ill.belowNeck || ill.severity >= 2))
+    return mk("recovery", [`active illness: ${ill.label}`], {
+      symptomDriven: true,
+      text: "Rest until you've been symptom-free for 24 hours, then ease back in.",
+      safety: "Training hard while ill can prolong it. If you have a fever, chest symptoms or feel very unwell, rest and consider seeing a clinician.",
+    });
+
   if (symptoms.some((x) => RED.includes(x)))
     return mk("recovery", ["you reported chest pain or dizziness"], {
       symptomDriven: true,
@@ -338,6 +347,11 @@ export function readiness(data: DataSet, day: DayKey, s = { sleep: sleepScore(da
   if (data.workouts.some((w) => w.date === yesterday && ((w.rpe ?? 0) >= 8 || w.durationMin >= 90))) lows.push("a hard session yesterday");
   if (loadFlag(data.workouts, day).band === "high") lows.push("a sharp jump in training load this week");
   if (hrvTrend(data.metrics, day).band === "below") lows.push("7-day HRV below your normal range");
+  if (ck?.soreness !== undefined && ck.soreness >= 7) lows.push("high muscle soreness");
+  if (ck?.stress !== undefined && ck.stress >= 8) lows.push("high stress");
+  if (ill) lows.push(`mild illness: ${ill.label}`);
+  const inj = active.find((c) => c.kind === "injury");
+  if (inj && inj.severity >= 2) lows.push(`active injury: ${inj.label}`);
 
   const sources = [recovery.status === "ok", s.sleep.status === "ok", ck !== undefined && (ck.energy !== undefined || ck.fatigue !== undefined)].filter(Boolean).length;
   if (sources === 0) return mk("insufficient", ["no recovery, sleep or check-in data today"]);

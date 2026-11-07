@@ -152,6 +152,7 @@ export const METRIC_RANGES: Record<MetricKey, [number, number]> = {
   activeMin: [0, 1440],
   calories: [0, 15_000],
   respiration: [4, 60],
+  spo2: [70, 100],
 };
 
 type MetricDraft = Omit<DailyMetric, "id" | "createdAt" | "updatedAt">;

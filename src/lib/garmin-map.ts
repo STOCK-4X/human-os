@@ -90,8 +90,9 @@ export function mapSleepSummaries(json: unknown, out: GarminRecords) {
       source: "garmin",
       externalId: `garmin-sleep:${date}`,
     });
-    // Overnight breathing rate belongs to the morning it ends on.
+    // Overnight breathing rate and SpO₂ belong to the morning they end on.
     pushMetric(out, date, "respiration", n(r.averageRespirationValue));
+    pushMetric(out, date, "spo2", n(r.averageSpO2Value));
   }
 }
 
@@ -160,6 +161,7 @@ export function mapActivities(json: unknown, out: GarminRecords) {
       elevationM: n(r.elevationGain) === undefined ? undefined : Math.round(n(r.elevationGain)!),
       calories: n(r.calories) === undefined ? undefined : Math.round(n(r.calories)!),
       hrZonesSec: zones(r),
+      isRace: s(obj(r.eventType)?.typeKey) === "race" || undefined,
       aerobicTE: n(r.aerobicTrainingEffect),
       anaerobicTE: n(r.anaerobicTrainingEffect),
       bestSplitsSec: splits(r),

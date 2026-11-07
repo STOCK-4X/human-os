@@ -10,6 +10,8 @@ import { SleepForm } from "@/components/forms/SleepForm";
 import { WorkoutForm, ACTIVITY_LABEL } from "@/components/forms/WorkoutForm";
 import { HabitList } from "@/components/HabitList";
 import { ReadinessCard, ScoreRings } from "@/components/ScoreRings";
+import { SessionCard, planInput } from "@/components/train/SessionCard";
+import { weekSessions } from "@/lib/prescribe";
 import { Card, Empty, Loading, Page, Sheet, SourceBadge, Stat } from "@/components/ui";
 import { useDataSet, useNow } from "@/hooks/data";
 import { buildBriefing } from "@/lib/briefing";
@@ -94,6 +96,7 @@ function Today({ data, now, sheet, setSheet }: { data: DataSet; now: Date; sheet
     >
       <ScoreRings scores={scores} history={history} profile={profile} />
       <ReadinessCard r={scores.readiness} />
+      <TodaySession data={data} today={today} />
 
       {!checkin && !skipped && (
         <div className="card flex items-center gap-3">
@@ -288,5 +291,31 @@ function SheetHost({ sheet, close, data, today }: { sheet: SheetKind; close: () 
         <WorkoutForm profile={data.profile} date={today} onDone={close} />
       </Sheet>
     </>
+  );
+}
+
+function TodaySession({ data, today }: { data: DataSet; today: string }) {
+  const week = weekSessions(planInput(data, today));
+  const session = week.find((s) => s.day === today);
+  const next = week.find((s) => s.day > today);
+  const logged = data.workouts.some((w) => w.date === today);
+  if (!session)
+    return (
+      <Link href="/train" className="card flex items-center justify-between text-sm">
+        <span>
+          <span className="block font-semibold">No session planned today</span>
+          <span className="text-muted">{next ? `Next: ${next.title} on ${formatDay(next.day, "EEEE")}` : "Set training days in Profile."}</span>
+        </span>
+        <ChevronRight size={18} className="text-muted" />
+      </Link>
+    );
+  return (
+    <section aria-label="Today's session">
+      <div className="mb-1.5 flex items-center justify-between px-1">
+        <span className="eyebrow">Today&apos;s session</span>
+        {logged ? <span className="text-xs font-medium text-good">Logged ✓</span> : <Link href="/train" className="text-xs text-muted">Week plan</Link>}
+      </div>
+      <SessionCard s={session} today={today} compact />
+    </section>
   );
 }

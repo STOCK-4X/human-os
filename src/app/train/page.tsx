@@ -13,7 +13,12 @@ import type { DataSet } from "@/lib/reports";
 import { dailyLoads } from "@/lib/analytics";
 import { PHASE_INFO, seasonPlan } from "@/lib/performance";
 import Link from "next/link";
-import { adjustForReadiness, formatPace, pace, strengthProgress, weeklyPlan, type PlannedSession } from "@/lib/training";
+import { formatPace, pace, strengthProgress } from "@/lib/training";
+import { bestVdot, vdotHistory } from "@/lib/performance";
+import { e1rmHistory, weeklySets } from "@/lib/strength";
+import { todayKey } from "@/lib/date";
+import { weekSessions } from "@/lib/prescribe";
+import { SessionCard, planInput } from "@/components/train/SessionCard";
 import type { DayKey, Workout } from "@/lib/types";
 
 export default function TrainPage() {
@@ -43,7 +48,7 @@ function Train({ data, today, onEdit }: { data: DataSet; today: DayKey; onEdit: 
   const [view, setView] = useState<"analytics" | "plan" | "run" | "strength" | "history">("analytics");
   const { profile } = data;
   const brief = buildBriefing(data, today);
-  const plan = weeklyPlan(profile, today);
+  const sessions = weekSessions(planInput(data, today));
   const ws = weekStart(today);
   const thisWeek = data.workouts.filter((w) => w.date >= ws && w.date <= addDays(ws, 6));
   const weeks = Array.from({ length: 8 }, (_, i) => addDays(ws, -7 * (7 - i)));
@@ -81,34 +86,25 @@ function Train({ data, today, onEdit }: { data: DataSet; today: DayKey; onEdit: 
         <>
           <SeasonCard data={data} today={today} />
           <Card title="This week's plan" action={<SourceBadge source="calculated" />}>
-            {plan.length === 0 ? (
+            {sessions.length === 0 ? (
               <Empty title="No training days set">Choose your available days in Profile.</Empty>
             ) : (
               <ul className="space-y-2">
-                {plan.map((s) => {
-                  const done = data.workouts.some((w) => w.date === s.day);
-                  const shown: PlannedSession & { adjusted?: string } = s.day === today ? adjustForReadiness(s, brief.training.intensity) : s;
-                  return (
-                    <li key={s.day} className={cx("rounded-xl border p-3", s.day === today ? "border-accent" : "border-line", s.day < today && !done && "opacity-60")}>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted">{formatDay(s.day, "EEEE")}{s.day === today && " · today"}</span>
-                        {done && <span className="text-xs font-medium text-good">Done</span>}
-                      </div>
-                      <div className="font-medium">{shown.title} <span className="text-sm font-normal text-muted">· {shown.durationMin} min</span></div>
-                      <p className="text-sm text-muted">{shown.detail}</p>
-                      {shown.adjusted && <p className="mt-1 text-xs text-accent">{shown.adjusted}</p>}
-                    </li>
-                  );
-                })}
+                {sessions.map((s) => (
+                  <li key={s.day} className={cx(s.day < today && !data.workouts.some((w) => w.date === s.day) && "opacity-60")}>
+                    <SessionCard s={s} today={today} />
+                    {data.workouts.some((w) => w.date === s.day) && <p className="mt-1 text-right text-xs font-medium text-good">Logged ✓</p>}
+                  </li>
+                ))}
               </ul>
             )}
-            <p className="mt-3 text-xs text-muted">A gentle template from your days, activities and level. Swap, shorten or skip freely — consistency over intensity.</p>
+            <p className="mt-3 text-xs text-muted">Built from your season phase, paces/zones and level; today adapts to your readiness and any injury or illness. Swap, shorten or skip freely. <Link href="/evidence#prescription" className="underline">How</Link></p>
           </Card>
           <Card title="Weekly volume">
             <div className="mb-2 grid grid-cols-3 gap-3">
               <Stat label="This week" value={thisWeek.reduce((a, w) => a + w.durationMin, 0) || undefined} unit="min" source="calculated" />
               <Stat label="Sessions" value={thisWeek.length || undefined} source="calculated" />
-              <Stat label="Planned" value={plan.length} source="calculated" />
+              <Stat label="Planned" value={sessions.filter((x) => x.kind !== "rest").length} source="calculated" />
             </div>
             <TrendChart label="Training minutes per week" kind="bar" data={volume} domain={[0, "auto"]} />
           </Card>
@@ -129,6 +125,7 @@ function Running({ data, imp, onEdit }: { data: DataSet; imp: boolean; onEdit: (
   const hrSeries = runs.filter((r) => r.avgHr).map((r) => ({ date: r.date, value: r.avgHr }));
   return (
     <>
+      <RunningFitness data={data} imp={imp} onEdit={onEdit} />
       <Card title="How to run easy">
         <ul className="space-y-2 text-sm">
           <li><strong>Easy means conversational.</strong> You can talk in full sentences. Most running should feel like this.</li>
@@ -160,6 +157,15 @@ function Running({ data, imp, onEdit }: { data: DataSet; imp: boolean; onEdit: (
 }
 
 function Strength({ data, imp }: { data: DataSet; imp: boolean }) {
+  return (
+    <>
+      <StrengthDose data={data} imp={imp} />
+      <StrengthList data={data} imp={imp} />
+    </>
+  );
+}
+
+function StrengthList({ data, imp }: { data: DataSet; imp: boolean }) {
   const prog = strengthProgress(data.workouts.filter((w) => w.type === "strength"));
   const u = imp ? "lb" : "kg";
   const w = (kg: number) => Math.round((imp ? kg / 0.45359237 : kg) * 10) / 10;
@@ -273,5 +279,83 @@ function SeasonCard({ data, today }: { data: DataSet; today: DayKey }) {
       </div>
       <p className="mt-2 text-xs text-muted">Targets are relative to your usual week and grow at most ≈5% a week (capped at +50%). Every 4th loading week is lighter; the taper cuts volume ≈40–60%.</p>
     </Card>
+  );
+}
+
+function RunningFitness({ data, imp, onEdit }: { data: DataSet; imp: boolean; onEdit: (w: Workout) => void }) {
+  const today = todayKey(data.profile.timeZone);
+  const est = bestVdot(data.workouts, today);
+  const hist = vdotHistory(data.workouts, today);
+  const races = data.workouts.filter((w) => w.isRace).sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <Card title="Running fitness over time" action={<SourceBadge source="calculated" />}>
+      {est ? (
+        <p className="text-sm">
+          VDOT <strong className="num text-lg">{est.vdot}</strong> <span className="text-muted">from {est.basis === "race" ? "a race" : "a training split"} ({est.from.label}, {formatDay(est.from.date, "d MMM")})</span>
+        </p>
+      ) : (
+        <p className="text-sm text-muted">No fast 5 km / 10 km efforts yet.</p>
+      )}
+      {hist.some((h) => h.value) && <TrendChart label="Best VDOT per month" data={hist} fmt={(n) => n.toFixed(0)} />}
+      <div className="mt-2">
+        <span className="eyebrow">Races</span>
+        {races.length ? (
+          <ul className="divide-y divide-line">
+            {races.map((r) => (
+              <li key={r.id}>
+                <button className="flex min-h-11 w-full items-center justify-between text-left text-sm" onClick={() => onEdit(r)}>
+                  <span>{r.title || "Race"} · {formatDay(r.date, "d MMM yy")}</span>
+                  <span className="num font-semibold">{r.distanceKm ? `${(imp ? r.distanceKm / 1.609344 : r.distanceKm).toFixed(2)} ${imp ? "mi" : "km"} · ` : ""}{formatDuration(r.durationMin)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">Mark a run as a race (edit it in History) to anchor your VDOT and paces to a real result.</p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function StrengthDose({ data, imp }: { data: DataSet; imp: boolean }) {
+  const today = todayKey(data.profile.timeZone);
+  const sets = weeklySets(data.workouts, today);
+  const exercises = [...new Set(data.workouts.flatMap((w) => (w.sets ?? []).filter((s) => s.weightKg).map((s) => s.exercise.trim())))];
+  const [ex, setEx] = useState(exercises[0] ?? "");
+  const hist = ex ? e1rmHistory(data.workouts, ex) : [];
+  const conv = (kg: number) => Math.round((imp ? kg / 0.45359237 : kg) * 10) / 10;
+  return (
+    <>
+      <Card title="Hard sets this week" action={<SourceBadge source="calculated" />}>
+        <ul className="space-y-1.5">
+          {sets.map((g) => (
+            <li key={g.group} className="flex items-center gap-2 text-sm">
+              <span className="w-36 shrink-0">{g.group}</span>
+              <span className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
+                <span className="absolute inset-y-0 bg-good/20" style={{ left: "33.3%", width: "33.3%" }} aria-hidden />
+                <span className={cx("absolute inset-y-0 left-0 rounded-full", g.status === "in range" ? "bg-good" : g.status === "high" ? "bg-warn" : "bg-accent")} style={{ width: `${Math.min(100, (g.sets / 30) * 100)}%` }} />
+              </span>
+              <span className="num w-8 text-right">{g.sets}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-muted">Shaded band = 10–20 hard sets per muscle group per week, where most people grow. Compound lifts count half for helper muscles; sets with RIR above 4 don&apos;t count.</p>
+      </Card>
+      {exercises.length > 0 && (
+        <Card title="Strength trend (est. 1RM)">
+          <select aria-label="Exercise" className="input mb-2" value={ex} onChange={(e) => setEx(e.target.value)}>
+            {exercises.map((e) => (
+              <option key={e}>{e}</option>
+            ))}
+          </select>
+          {hist.length > 1 ? (
+            <TrendChart label={`Estimated 1RM for ${ex}`} data={hist.map((h) => ({ date: h.date, value: conv(h.value) }))} fmt={(n) => `${Math.round(n)}`} />
+          ) : (
+            <p className="text-sm text-muted">Needs two sessions with weights for this exercise.</p>
+          )}
+        </Card>
+      )}
+    </>
   );
 }

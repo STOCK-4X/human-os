@@ -5,7 +5,7 @@ import { useState } from "react";
 import { db } from "@/lib/db";
 import { clockOf, nowIso, zonedToIso } from "@/lib/date";
 import type { ActivityType, DayKey, Profile, StrengthSet, Workout } from "@/lib/types";
-import { Field, Notice } from "../ui";
+import { Field, Notice, Toggle } from "../ui";
 
 export const ACTIVITY_LABEL: Record<ActivityType, string> = {
   run: "Run",
@@ -52,6 +52,7 @@ export function WorkoutForm({ profile, date, existing, onDone }: { profile: Prof
   const [rpe, setRpe] = useState(existing?.rpe?.toString() ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [sets, setSets] = useState<StrengthSet[]>(existing?.sets ?? []);
+  const [isRace, setIsRace] = useState(Boolean(existing?.isRace));
   const [error, setError] = useState<string>();
 
   const addSet = () => setSets((s) => [...s, s.length ? { ...s[s.length - 1] } : { exercise: "Squat", reps: 8, weightKg: undefined, restSec: 90 }]);
@@ -74,6 +75,7 @@ export function WorkoutForm({ profile, date, existing, onDone }: { profile: Prof
       rpe: r,
       notes: notes.trim() || undefined,
       sets: type === "strength" ? sets.filter((s) => s.exercise && s.reps > 0) : undefined,
+      isRace: type === "run" && isRace ? true : undefined,
       updatedAt: now,
     };
     if (!existing) w.externalId = `manual:${crypto.randomUUID()}`;
@@ -117,7 +119,7 @@ export function WorkoutForm({ profile, date, existing, onDone }: { profile: Prof
           <span className="label">Sets</span>
           <div className="space-y-2">
             {sets.map((s, i) => (
-              <div key={i} className="grid grid-cols-[1fr_3.5rem_4.5rem_2.5rem] items-center gap-2">
+              <div key={i} className="grid grid-cols-[1fr_3rem_3.75rem_3rem_2.25rem] items-center gap-1.5">
                 <input
                   aria-label="Exercise"
                   list="exercise-list"
@@ -141,12 +143,21 @@ export function WorkoutForm({ profile, date, existing, onDone }: { profile: Prof
                   placeholder="kg"
                   onChange={(e) => setSets((all) => all.map((x, j) => (j === i ? { ...x, weightKg: n(e.target.value) } : x)))}
                 />
+                <input
+                  aria-label="Reps in reserve"
+                  inputMode="numeric"
+                  className="input px-2"
+                  value={s.rir ?? ""}
+                  placeholder="RIR"
+                  onChange={(e) => setSets((all) => all.map((x, j) => (j === i ? { ...x, rir: n(e.target.value) } : x)))}
+                />
                 <button aria-label="Remove set" className="btn-quiet px-0" onClick={() => setSets((all) => all.filter((_, j) => j !== i))}>
                   <Trash2 size={16} />
                 </button>
               </div>
             ))}
           </div>
+          <p className="mt-1 text-xs text-muted">RIR = reps you could still have done (0 = failure). 1–3 is the productive range for most sets.</p>
           <datalist id="exercise-list">
             {EXERCISES.map((e) => (
               <option key={e} value={e} />
@@ -157,6 +168,7 @@ export function WorkoutForm({ profile, date, existing, onDone }: { profile: Prof
           </button>
         </div>
       )}
+      {type === "run" && <Toggle label="This was a race or time trial" hint="Races give the most accurate VDOT and paces." checked={isRace} onChange={setIsRace} />}
       <Field label="Notes">{(id) => <input id={id} className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="How did it feel?" />}</Field>
       {error && <Notice tone="bad">{error}</Notice>}
       <div className="flex gap-2">

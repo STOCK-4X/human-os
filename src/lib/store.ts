@@ -78,7 +78,7 @@ export async function importCsv(text: string, database: HumanOsDb = db): Promise
 }
 
 export async function loadDataSet(database: HumanOsDb = db): Promise<DataSet> {
-  const [profile, metrics, sleep, workouts, habits, habitLogs, checkins, lifestyle] = await Promise.all([
+  const [profile, metrics, sleep, workouts, habits, habitLogs, checkins, lifestyle, conditions] = await Promise.all([
     getProfile(database),
     database.metrics.toArray(),
     database.sleep.toArray(),
@@ -87,8 +87,9 @@ export async function loadDataSet(database: HumanOsDb = db): Promise<DataSet> {
     database.habitLogs.toArray(),
     database.checkins.toArray(),
     database.lifestyle.toArray(),
+    database.conditions.toArray(),
   ]);
-  return { profile, metrics, sleep, workouts, habits, habitLogs, checkins, lifestyle };
+  return { profile, metrics, sleep, workouts, habits, habitLogs, checkins, lifestyle, conditions };
 }
 
 export const EXPORT_FORMAT = "human-os-export";

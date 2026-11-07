@@ -4,6 +4,7 @@ import { sleepAmount, sleepConsistency, timeInBedMin } from "./sleep";
 import { BASELINE_WINDOW_DAYS, baseline, mean, type Baseline } from "./stats";
 import type {
   CheckIn,
+  Condition,
   DailyMetric,
   DayKey,
   Habit,
@@ -26,6 +27,8 @@ export interface DataSet {
   habitLogs: HabitLog[];
   checkins: CheckIn[];
   lifestyle: LifestyleLog[];
+  /** Injury & illness log (optional for callers that don't load it). */
+  conditions?: Condition[];
 }
 
 /** User corrections win, then device sources, then file imports. */

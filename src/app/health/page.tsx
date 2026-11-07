@@ -3,14 +3,15 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { BodyTab } from "@/components/health/BodyTab";
+import { ConditionsTab } from "@/components/health/ConditionsTab";
 import { RecoveryTab } from "@/components/health/RecoveryTab";
 import { SleepTab } from "@/components/health/SleepTab";
 import { TrendsTab } from "@/components/health/TrendsTab";
 import { Loading, Page, Segmented } from "@/components/ui";
 import { useDataSet, useToday } from "@/hooks/data";
 
-type Tab = "sleep" | "recovery" | "body" | "trends";
-const TABS: Tab[] = ["sleep", "recovery", "body", "trends"];
+type Tab = "sleep" | "recovery" | "body" | "care" | "trends";
+const TABS: Tab[] = ["sleep", "recovery", "body", "care", "trends"];
 
 function Health() {
   const params = useSearchParams();
@@ -29,6 +30,7 @@ function Health() {
           { value: "sleep", label: "Sleep" },
           { value: "recovery", label: "Recovery" },
           { value: "body", label: "Body" },
+          { value: "care", label: "Injury" },
           { value: "trends", label: "Trends" },
         ]}
       />
@@ -40,6 +42,8 @@ function Health() {
         <RecoveryTab data={data} today={today} />
       ) : tab === "body" ? (
         <BodyTab profile={data.profile} today={today} />
+      ) : tab === "care" ? (
+        <ConditionsTab data={data} today={today} />
       ) : (
         <TrendsTab data={data} today={today} />
       )}

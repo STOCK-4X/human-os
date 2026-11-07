@@ -6,6 +6,7 @@ import type {
   Challenge,
   CheckIn,
   CoachMemory,
+  Condition,
   CustomAchievement,
   DailyMetric,
   Experiment,
@@ -46,6 +47,7 @@ export class HumanOsDb extends Dexie {
   coachMemory!: EntityTable<CoachMemory, "id">;
   achievements!: EntityTable<UnlockedAchievement, "key">;
   customAchievements!: EntityTable<CustomAchievement, "id">;
+  conditions!: EntityTable<Condition, "id">;
 
   constructor(name = "human-os") {
     super(name);
@@ -71,6 +73,7 @@ export class HumanOsDb extends Dexie {
       achievements: "key, achievedOn, category",
       customAchievements: "++id",
     });
+    this.version(3).stores({ conditions: "++id, kind, start" });
   }
 }
 
@@ -95,6 +98,7 @@ export const DATA_TABLES = [
   "coachMemory",
   "achievements",
   "customAchievements",
+  "conditions",
 ] as const;
 export type TableName = (typeof DATA_TABLES)[number];
 

@@ -10,7 +10,7 @@ export interface Source {
 
 export interface Method {
   id: string;
-  area: "Training load" | "Running" | "Heart rate" | "Recovery & HRV" | "Season planning" | "Fuel" | "Sleep" | "Strength" | "Habits";
+  area: "Training load" | "Running" | "Heart rate" | "Recovery & HRV" | "Season planning" | "Injury & illness" | "Fuel" | "Sleep" | "Strength" | "Habits";
   title: string;
   inApp: string;
   how: string;
@@ -104,7 +104,7 @@ export const METHODS: Method[] = [
     area: "Recovery & HRV",
     title: "Subjective wellness check-in",
     inApp: "Today → morning check-in; Recovery and Readiness",
-    how: "How you feel (energy, tiredness, focus, symptoms) is combined with device data; feeling unwell always outranks a good score.",
+    how: "How you feel (energy, tiredness, focus, muscle soreness, stress, symptoms) is combined with device data; high soreness or stress counts as a readiness signal, and feeling unwell always outranks a good score.",
     sources: [{ cite: "Hooper SL, Mackinnon LT. Monitoring overtraining in athletes. Sports Med. 1995." }],
   },
   {
@@ -117,6 +117,30 @@ export const METHODS: Method[] = [
       { cite: "Bompa TO, Haff GG. Periodization: Theory and Methodology of Training. Human Kinetics." },
       { cite: "Mujika I, Padilla S. Scientific bases for precompetition tapering strategies. Med Sci Sports Exerc. 2003." },
       { cite: "Bosquet L, et al. Effects of tapering on performance: a meta-analysis. Med Sci Sports Exerc. 2007." },
+    ],
+  },
+  {
+    id: "prescription",
+    area: "Season planning",
+    title: "Workout prescription",
+    inApp: "Today → Today's session; Train → Week",
+    how: "Each week mixes mostly easy sessions with one or two quality sessions (threshold, intervals or race pace depending on the phase), a long session at the weekend and strength 1–2×. Targets come from your VDOT paces or heart-rate zones. Today's session is only ever made easier — never harder — by low readiness, injury or illness.",
+    sources: [
+      { cite: "Daniels J. Daniels' Running Formula, 3rd ed. Human Kinetics; 2014." },
+      { cite: "Seiler S. What is best practice for training intensity and duration distribution in endurance athletes? Int J Sports Physiol Perform. 2010." },
+      { cite: "Friel J. The Triathlete's Training Bible. VeloPress." },
+    ],
+  },
+  {
+    id: "conditions",
+    area: "Injury & illness",
+    title: "Injury & illness log and return to training",
+    inApp: "Health → Injury",
+    how: "Active injuries and illnesses change readiness and today's session. Illness with below-the-neck symptoms means rest; return gradually once symptom-free. Injuries follow pain-guided, graded run/walk progression. The log shows your load ratio before each onset.",
+    caveat: "General guidance, not a diagnosis or treatment plan. Severe or persistent problems need a clinician.",
+    sources: [
+      { cite: "Soligard T, et al. How much is too much? (Part 1) IOC consensus statement on load in sport and risk of injury. Br J Sports Med. 2016." },
+      { cite: "Schwellnus M, et al. How much is too much? (Part 2) IOC consensus statement on load in sport and risk of illness. Br J Sports Med. 2016." },
     ],
   },
   {
@@ -149,7 +173,7 @@ export const METHODS: Method[] = [
     area: "Strength",
     title: "Estimated 1RM and progressive overload",
     inApp: "Train → Strength",
-    how: "Estimated one-rep max with the Epley formula; progress = more weight or volume at a similar effort.",
+    how: "Estimated one-rep max (Epley) trend per exercise; weekly hard sets per muscle group against a 10–20 set range; sets logged with reps in reserve (RIR) — sets with RIR above 4 don't count as hard.",
     sources: [
       { cite: "Epley B. Poundage Chart. Boyd Epley Workout; 1985." },
       { cite: "Schoenfeld BJ, Ogborn D, Krieger JW. Dose-response relationship between weekly resistance training volume and increases in muscle mass. J Sports Sci. 2017." },

@@ -26,6 +26,8 @@ const FACTORS: Record<string, Factor> = {
   mood: { label: "Mood (1–10)", get: (d, day) => d.checkins.find((c) => c.date === day)?.mood },
   focus: { label: "Mental focus (1–10)", get: (d, day) => d.checkins.find((c) => c.date === day)?.focus },
   tiredness: { label: "Physical tiredness (1–10)", get: (d, day) => d.checkins.find((c) => c.date === day)?.fatigue },
+  soreness: { label: "Muscle soreness (1–10)", get: (d, day) => d.checkins.find((c) => c.date === day)?.soreness },
+  lifeStress: { label: "Stress, felt (1–10)", get: (d, day) => d.checkins.find((c) => c.date === day)?.stress },
   hrv: { label: "HRV (ms)", get: (d, day) => metricSeries(d.metrics, "hrv", day, day)[0]?.value },
   rhr: { label: "Resting HR (bpm)", get: (d, day) => metricSeries(d.metrics, "rhr", day, day)[0]?.value },
   prevCaffeine: {

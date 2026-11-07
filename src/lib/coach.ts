@@ -5,6 +5,11 @@ import { indexLogs, streak, consistency } from "./habits";
 import { compare, type DataSet, metricBaseline, metricOn, sleepInRange, summarize } from "./reports";
 import { sleepAmount, timeInBedMin } from "./sleep";
 import { scoresFor } from "./scores";
+import { hrMax, loadFlag, pmc } from "./analytics";
+import { activeConditions } from "./conditions";
+import { bestVdot, hrvTrend, seasonPlan, zonesFor } from "./performance";
+import { todaySession } from "./prescribe";
+import { daysBetween } from "./date";
 import { round } from "./stats";
 
 /**
@@ -46,7 +51,7 @@ export const CoachPayloadSchema = z.object({
     z.object({ today: num, source: z.string().max(10).optional(), baseline: num, baselineDays: z.number() }),
   ),
   checkin: z
-    .object({ scale: z.literal("1-10"), energy: num, physicalTiredness: num, focus: num, mood: num, unwell: z.boolean().optional(), symptoms: z.array(z.string().max(20)).max(10) })
+    .object({ scale: z.literal("1-10"), energy: num, physicalTiredness: num, focus: num, mood: num, soreness: num, stress: num, unwell: z.boolean().optional(), symptoms: z.array(z.string().max(20)).max(10) })
     .optional(),
   workouts: z
     .array(z.object({ date: z.string().max(10), type: z.string().max(20), durationMin: z.number(), rpe: num, distanceKm: num }))
@@ -67,6 +72,22 @@ export const CoachPayloadSchema = z.object({
       readiness: z.string().max(20),
       garminBodyBattery: num,
       deviceSleepScore: num,
+    })
+    .optional(),
+  training: z
+    .object({
+      fitnessCtl: num,
+      fatigueAtl: num,
+      formTsb: num,
+      loadRatioAcwr: num,
+      loadBand: z.string().max(20).optional(),
+      vdot: num,
+      vdotBasis: z.string().max(10).optional(),
+      hrvTrend: z.string().max(20).optional(),
+      seasonPhase: z.string().max(20).optional(),
+      goalRace: z.object({ name: z.string().max(80), date: z.string().max(10), distanceKm: num }).optional(),
+      todaySession: z.object({ title: z.string().max(80), minutes: z.number(), steps: z.array(z.string().max(200)).max(8), adjusted: z.string().max(300).optional() }).optional(),
+      conditions: z.array(z.object({ kind: z.string().max(10), label: z.string().max(80), severity: z.number(), sinceDays: z.number() })).max(5),
     })
     .optional(),
   calculated: z.object({
@@ -179,7 +200,8 @@ export function buildCoachPayload(
     },
     nights,
     recovery,
-    checkin: ck && { scale: "1-10" as const, energy: ck.energy, physicalTiredness: ck.fatigue, focus: ck.focus, mood: ck.mood, unwell: ck.unwell, symptoms: ck.symptoms },
+    checkin: ck && { scale: "1-10" as const, energy: ck.energy, physicalTiredness: ck.fatigue, focus: ck.focus, mood: ck.mood, soreness: ck.soreness, stress: ck.stress, unwell: ck.unwell, symptoms: ck.symptoms },
+    training: trainingBlock(data, today),
     workouts: data.workouts
       .filter((w) => w.date > addDays(today, -14) && w.date <= today)
       .slice(-30)
@@ -195,5 +217,39 @@ export function buildCoachPayload(
     memory: memory.slice(-20),
     question,
     history,
+  };
+}
+
+function trainingBlock(data: DataSet, today: string): CoachPayload["training"] {
+  const p = pmc(data.workouts, today).points.at(-1);
+  const flag = loadFlag(data.workouts, today);
+  const max = hrMax(data.workouts, data.profile, today);
+  const rest = metricBaseline(data.metrics, "rhr", today).mean;
+  const vd = bestVdot(data.workouts, today);
+  const input = {
+    profile: data.profile,
+    today,
+    vdot: vd,
+    zones: zonesFor(data.profile.zoneMethod ?? "hrmax", { max: max?.bpm, rest, lthr: data.profile.lthr }),
+    readiness: scoresFor(data, today).readiness,
+    conditions: data.conditions,
+  };
+  const s = todaySession(input);
+  const goal = data.profile.goalRace?.date && data.profile.goalRace.date >= today ? data.profile.goalRace : undefined;
+  return {
+    fitnessCtl: p ? Math.round(p.ctl) : undefined,
+    fatigueAtl: p ? Math.round(p.atl) : undefined,
+    formTsb: p ? Math.round(p.tsb) : undefined,
+    loadRatioAcwr: flag.ratio,
+    loadBand: flag.band,
+    vdot: vd?.vdot,
+    vdotBasis: vd?.basis,
+    hrvTrend: hrvTrend(data.metrics, today).band,
+    seasonPhase: goal ? seasonPlan(goal, today)[0]?.phase : undefined,
+    goalRace: goal && { name: goal.name.slice(0, 80), date: goal.date, distanceKm: goal.distanceKm },
+    todaySession: s && { title: s.title, minutes: s.totalMin, steps: s.steps.map((x) => `${x.label}: ${x.detail}`.slice(0, 200)), adjusted: s.adjusted?.slice(0, 300) },
+    conditions: activeConditions(data.conditions ?? [], today)
+      .slice(0, 5)
+      .map((c) => ({ kind: c.kind, label: c.label.slice(0, 80), severity: c.severity, sinceDays: daysBetween(c.start, today) })),
   };
 }
